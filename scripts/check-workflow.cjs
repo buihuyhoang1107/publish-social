@@ -52,4 +52,4 @@ const media = build({ message: { chat: { id: 1 }, photo: [{ file_id: 'sample' }]
 assert.equal(media.content, '');
 assert.ok(render(media).includes('V1 chi nhan text'));
 console.log('PASS: workflow structure, Master Post, routing, plain text, long preview, non-text guidance.');
-console.log('NOT_RUN: n8n expression engine and live Telegram webhook/credentials.');
+console.log('Scope: offline checks only; n8n runtime and live Telegram require separate verification.');
