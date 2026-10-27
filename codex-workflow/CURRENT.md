@@ -2,6 +2,9 @@
 
 ## Cập nhật mới nhất 27/10/2026
 
+- User đã kết nối đủ 3 kênh (Free): API xác nhận TikTok thieponline.org, Facebook Page Thiệp online Trọng Hoàng, Threads bhhoang_1107, tất cả isDisconnected=false/isLocked=false. Payload temp/buffer-three-channels-verified.json.
+- Đã thu gọn config.services thành [tiktok,facebook,threads], help Telegram lấy label theo config, không báo thiếu Instagram. Rebuild/import/publish cùng workflow ID và restart n8n; không đăng thử nội dung cũ. Routing check bằng payload thật PASS đúng 3 targets.
+
 - User yêu cầu nhiều ảnh và nhiều nền tảng, đã chọn Facebook Page + Instagram + Threads ngoài TikTok. Workflow live cùng ID đã nâng thành Social Publisher - Telegram Multi Platform.
 - Album <=10 ảnh qua media_group_id: spool từng update, một coordinator, chờ quiet period, giữ thứ tự message_id/caption, tải đủ trước đăng; receipt aliases và khóa từng kênh chống lặp.
 - Fan-out đọc account/channels mỗi bài, gửi đồng thời tới mọi kênh kết nối thuộc services [tiktok,facebook,instagram,threads]. Kênh thiếu/khóa/lỗi báo riêng không chặn kênh khác. /status không tạo lại bài; receipt single TikTok cũ vẫn đọc được.

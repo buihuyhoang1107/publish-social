@@ -1,9 +1,11 @@
 # Đăng album và nhiều nền tảng từ Telegram
 
-Luồng: **Telegram → n8n → Buffer → TikTok / Facebook Page / Instagram / Threads → kết quả về Telegram**.
+Luồng: **Telegram → n8n → Buffer → TikTok / Facebook Page / Threads → kết quả về Telegram**.
 Bạn dùng bot Telegram hiện có để đăng bài. Buffer chỉ cần mở khi kết nối tài khoản.
-Đã bật tự phát hiện các kênh thuộc bốn nền tảng này trong Buffer mỗi lần đăng.
-Hiện API xác nhận chỉ TikTok `thieponline.org` đã kết nối.
+Đã bật tự phát hiện các kênh thuộc ba nền tảng này trong Buffer mỗi lần đăng.
+API đã xác nhận: TikTok `thieponline.org`, Facebook Page `Thiệp online Trọng Hoàng`,
+Threads `bhhoang_1107`; cả ba không bị khóa hoặc ngắt kết nối. Cấu hình hiện tại
+không bao gồm Instagram; bot không báo thiếu kênh Instagram.
 
 ## Cách dùng
 
@@ -18,16 +20,16 @@ Hiện API xác nhận chỉ TikTok `thieponline.org` đã kết nối.
 hạn tải của Telegram Bot API. Có thể gửi dạng photo/video hoặc file tài liệu.
 Không hỗ trợ album trộn video/ảnh hoặc nhiều video. Bài chỉ có chữ hiện chưa được đăng.
 
-## Kết nối Facebook Page, Instagram, Threads một lần
+## Kết nối kênh
 
-Mở [Buffer Channels](https://publish.buffer.com/settings/channels), chọn kết nối
-từng kênh và cấp quyền bằng tài khoản của bạn. Facebook chọn đúng **Page**; Instagram
-cần Professional (Business/Creator) để tự đăng. Kết nối Threads thành kênh riêng.
+Đã kết nối đủ ba kênh tại [Buffer Channels](https://publish.buffer.com/settings/channels).
+Khi cần kết nối lại, chọn đúng Facebook **Page** và tài khoản Threads.
 Luồng sẽ tự đọc các kênh mới trong lần đăng tiếp theo, không cần nhập channel ID.
 Một nền tảng có nhiều kênh được kết nối thì bài được gửi tới tất cả kênh của nền tảng đó.
 
-Gói Free giới hạn 3 kênh; để giữ cả TikTok + Facebook + Instagram + Threads cần gói
-cho phép ít nhất 4 kênh. Không tự mua hoặc đổi gói trong quá trình cấu hình.
+Gói Free giới hạn 3 kênh, đủ cho cấu hình hiện tại. Nếu sau này thêm Instagram thành
+kênh thứ tư thì cần gói cho phép ít nhất 4 kênh và bổ sung service vào config.
+Không tự mua hoặc đổi gói trong quá trình cấu hình.
 Nguồn: [kết nối kênh](https://support.buffer.com/articles/connecting-your-channels-to-buffer-HvWLgAJvL9),
 [Instagram tự đăng](https://support.buffer.com/en-us/articles/scheduling-instagram-posts-reels-stories-and-notifications-3XA98S9Q5p),
 [gói Buffer](https://buffer.com/pricing).
@@ -83,7 +85,8 @@ rồi chạy script không flag từ host. Instance test cần mount `/files` ri
 4 request publish chồng thời gian, lỗi GraphQL/HTTP riêng từng kênh, chưa kết nối,
 dedup album và `/status` qua alias, thiếu file không đăng nửa album; hồi quy ảnh
 đơn/video/AI, owner allowlist, binary và media GET/HEAD. Test dùng mock bốn kênh,
-không đăng nội dung thử lên tài khoản thật. Ba nền tảng Meta chưa có kết nối thật.
+không đăng nội dung thử lên tài khoản thật. API đã xác nhận kết nối Facebook và
+Threads; chưa tạo bài đăng thử thật trên hai kênh này trong bước xác minh kết nối.
 
 Ngày 27/10/2026: đã phục hồi ảnh/caption của tin nhắn Telegram 53 từ execution 48
 và gửi đúng bài đó, không yêu cầu gửi lại. Đã nhận trạng thái `sent` lúc 15:06:

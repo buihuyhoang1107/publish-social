@@ -5,7 +5,8 @@ if (!message || message.chat?.type !== 'private' || !publisherConfig.allowedUser
 const context = { chatId: message.chat.id, messageId: message.message_id, shouldPublish: false, queryStatus: false, isAlbum: false };
 const reply = (text) => [{ json: { ...context, text } }];
 const command = (message.text ?? '').split(/\s/, 1)[0].split('@', 1)[0];
-const help = 'Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tự gửi đăng lên TikTok, Facebook Page, Instagram và Threads đã kết nối. Không cần duyệt.\nVới nhiều ảnh: chọn các ảnh và gửi chung thành một album, nhập caption một lần. Mỗi file tối đa 20 MB.\nVideo AI: thêm /ai ở đầu caption.\nGửi /status để xem kết quả từng nền tảng của bài gần nhất.';
+const platformLabels = { tiktok: 'TikTok', facebook: 'Facebook Page', instagram: 'Instagram', threads: 'Threads' };
+const help = `Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tự gửi đăng lên ${publisherConfig.services.map((service) => platformLabels[service]).join(', ')} đã kết nối. Không cần duyệt.\nVới nhiều ảnh: chọn các ảnh và gửi chung thành một album, nhập caption một lần. Mỗi file tối đa 20 MB.\nVideo AI: thêm /ai ở đầu caption.\nGửi /status để xem kết quả từng nền tảng của bài gần nhất.`;
 if (command === '/status') {
   let target = message.reply_to_message?.message_id ?? Number((message.text ?? '').split(/\s+/)[1]);
   if (!Number.isSafeInteger(target) || target <= 0) {

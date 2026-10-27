@@ -2,8 +2,9 @@
 
 > Cập nhật 27/10/2026: **Social Publisher - Telegram Multi Platform** đã bật,
 > nhận một ảnh, album tối đa 10 ảnh hoặc video + caption; gửi đăng các kênh TikTok,
-> Facebook Page, Instagram, Threads đã kết nối. TikTok đã đăng bài thật thành công.
-> Ba kênh Meta chưa kết nối; cần người dùng cấp quyền một lần trong Buffer.
+> Facebook Page, Threads đã kết nối. TikTok đã đăng bài thật thành công.
+> API đã xác nhận đủ TikTok thieponline.org, Facebook Page Thiệp online Trọng Hoàng,
+> Threads bhhoang_1107; cấu hình đã thu gọn về đúng ba nền tảng, không gồm Instagram.
 > Runtime test riêng PASS album 10 ảnh, 4 kênh song song, lỗi từng kênh và chống lặp.
 > Xem [luồng hiện tại](docs/TELEGRAM_PUBLISHER.md). Các trạng thái dưới đây là lịch sử.
 
