@@ -214,12 +214,26 @@
       }
     },
     {
+      "id": "download-each-media",
+      "name": "Download Each Media",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        480,
+        240
+      ],
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      }
+    },
+    {
       "id": "download-media",
       "name": "Download Media",
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        480,
+        720,
         240
       ],
       "parameters": {
@@ -229,7 +243,10 @@
         "download": true,
         "additionalFields": {}
       },
-      "onError": "continueRegularOutput"
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
     },
     {
       "id": "prepare-media",
@@ -237,7 +254,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        720,
+        960,
         240
       ],
       "parameters": {
@@ -251,7 +268,7 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        960,
+        1200,
         240
       ],
       "parameters": {
@@ -268,7 +285,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1200,
+        1440,
         240
       ],
       "parameters": {
@@ -282,7 +299,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1440,
+        1680,
         240
       ],
       "parameters": {
@@ -306,8 +323,8 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        1680,
-        240
+        0,
+        480
       ],
       "parameters": {
         "method": "POST",
@@ -330,7 +347,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
+        240,
         480
       ],
       "parameters": {
@@ -343,7 +360,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        240,
+        480,
         480
       ],
       "parameters": {
@@ -377,7 +394,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        480,
+        720,
         480
       ],
       "parameters": {
@@ -401,7 +418,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        720,
+        960,
         480
       ],
       "parameters": {
@@ -414,7 +431,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        960,
+        1200,
         480
       ],
       "parameters": {
@@ -427,7 +444,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1200,
+        1440,
         480
       ],
       "parameters": {
@@ -440,7 +457,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        1440,
+        1680,
         480
       ],
       "parameters": {
@@ -474,8 +491,8 @@
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        1680,
-        480
+        0,
+        720
       ],
       "parameters": {
         "resume": "timeInterval",
@@ -490,7 +507,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
+        240,
         720
       ],
       "parameters": {
@@ -503,7 +520,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        240,
+        480,
         720
       ],
       "parameters": {
@@ -537,7 +554,7 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        480,
+        720,
         720
       ],
       "parameters": {
@@ -561,7 +578,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        720,
+        960,
         720
       ],
       "parameters": {
@@ -574,7 +591,7 @@
       "type": "n8n-nodes-base.if",
       "typeVersion": 2.2,
       "position": [
-        960,
+        1200,
         720
       ],
       "parameters": {
@@ -608,7 +625,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        1200,
+        1440,
         720
       ],
       "parameters": {
@@ -621,7 +638,7 @@
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
       "position": [
-        1440,
+        1680,
         720
       ],
       "parameters": {
@@ -643,8 +660,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
-        1680,
-        720
+        0,
+        960
       ],
       "parameters": {
         "httpMethod": [
@@ -664,7 +681,7 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        0,
+        240,
         960
       ],
       "parameters": {
@@ -677,7 +694,7 @@
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
-        240,
+        480,
         960
       ],
       "parameters": {
@@ -695,7 +712,7 @@
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
-        480,
+        720,
         960
       ],
       "parameters": {
@@ -844,18 +861,25 @@
       "main": [
         [
           {
-            "node": "Download Media",
+            "node": "Download Each Media",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Download Media": {
+    "Download Each Media": {
       "main": [
         [
           {
             "node": "Prepare Media",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Download Media",
             "type": "main",
             "index": 0
           }
@@ -1129,6 +1153,17 @@
         [
           {
             "node": "Send Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Media": {
+      "main": [
+        [
+          {
+            "node": "Download Each Media",
             "type": "main",
             "index": 0
           }

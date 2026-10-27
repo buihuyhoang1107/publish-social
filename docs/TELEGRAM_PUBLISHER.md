@@ -62,6 +62,10 @@ Bot bỏ tiền tố này khỏi caption và gửi cờ AI cho TikTok.
   giây và kiểm tra ít nhất 3 giây không có ảnh mới. Gom theo thứ tự `message_id`,
   lấy caption trong album, không đăng riêng từng ảnh. Tải/lưu thiếu một file thì
   toàn bộ bài chưa được gửi đăng. Các phần giao lại không kéo dài thời gian chờ.
+- Tải từng file qua vòng lặp `Download Each Media`; mỗi file thử tối đa 3 lần,
+  cách nhau 2 giây khi lỗi. Điều này cho phép n8n retry đúng cả file lỗi ở giữa album.
+  Chỉ chuyển sang chuẩn bị/lưu media sau khi kết thúc tải; vẫn chặn toàn bộ bài
+  nếu còn file lỗi. Các request tạo bài lên Buffer không retry.
 - Receipt từng ảnh trong album trỏ về receipt chung; `/status` trả lời bất kỳ ảnh
   nào cũng xem cùng một bài. Album đã chốt không tự tạo bài mới khi có ảnh đến muộn.
 - Receipt từng kênh riêng trong `/files/telegram-target-*.json`, tạo `wx` trước API;

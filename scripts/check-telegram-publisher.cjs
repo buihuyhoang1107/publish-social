@@ -27,7 +27,7 @@ if (process.argv.includes('--prepare')) {
     if (['Telegram Accepted', 'Telegram Reply'].includes(n.name)) { n.type = 'n8n-nodes-base.noOp'; n.typeVersion = 1; n.parameters = {}; }
     if (n.name === 'Download Media') {
       n.type = 'n8n-nodes-base.code'; n.typeVersion = 2;
-      n.parameters = { jsCode: "return await Promise.all($input.all().map(async (item, index) => item.json.fileId === 'broken' ? { json: { error: 'test download failure' }, pairedItem: { item: index } } : { json: {}, binary: { data: await this.helpers.prepareBinaryData(Buffer.from('test-media:' + item.json.fileId), 'file.' + item.json.extension, item.json.mediaType === 'image' ? 'image/jpeg' : 'video/mp4') }, pairedItem: { item: index } }));" };
+      n.parameters = { jsCode: "const fs = require('fs'); return await Promise.all($input.all().map(async (item, index) => { const file = '/files/download-attempt-' + item.json.messageId + '.json'; let attempts = 0; try { attempts = JSON.parse(fs.readFileSync(file, 'utf8')); } catch (error) { if (error.code !== 'ENOENT') throw error; } fs.writeFileSync(file, JSON.stringify(++attempts)); if (item.json.fileId === 'broken' || (item.json.fileId === 'flaky' && attempts < 3)) return { json: { error: 'test download failure' }, pairedItem: { item: index } }; return { json: {}, binary: { data: await this.helpers.prepareBinaryData(Buffer.from('test-media:' + item.json.fileId), 'file.' + item.json.extension, item.json.mediaType === 'image' ? 'image/jpeg' : 'video/mp4') }, pairedItem: { item: index } }; }));" };
     }
     if (n.type === 'n8n-nodes-base.httpRequest') { n.parameters.authentication = 'none'; delete n.parameters.genericAuthType; n.parameters.url = 'http://127.0.0.1:5681/graphql'; }
     if (n.name === 'Wait For Buffer') n.parameters.amount = 1;
@@ -130,10 +130,17 @@ if (process.argv.includes('--prepare')) {
     assert.ok(broken.some(r => r.text?.includes('Toàn bộ bài chưa được gửi đăng'))); assert.equal(await count(), afterAlbum, 'Download failure must not publish a partial album');
     const emptyCaption = await Promise.all([send(photo(60, '', 'empty-' + base), true), send(photo(61, '', 'empty-' + base), true)]);
     assert.ok(emptyCaption.some(r => r.text?.includes('Album chưa có caption'))); assert.equal(await count(), afterAlbum);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'temp/telegram-publisher-test-media/download-attempt-' + (base + 51) + '.json'), 'utf8')), 3, 'Permanent download failure retries three times');
+    const flakyAlbum = await Promise.all([send(photo(340, 'Transient download', 'flaky-' + base), true), send(photo(341, '', 'flaky-' + base, 'flaky'), true), send(photo(342, '', 'flaky-' + base), true)]);
+    assert.equal(flakyAlbum.find(r => r.status)?.status, 'sent', JSON.stringify(flakyAlbum));
+    const flakyCalls = (await stats()).calls.filter(c => c.text === 'Transient download');
+    assert.equal(flakyCalls.length, 4);
+    for (const c of flakyCalls) assert.deepEqual(c.contents, ['test-media:image-340', 'test-media:flaky', 'test-media:image-342']);
+    for (const [id, attempts] of [[340, 1], [341, 3], [342, 1]]) assert.equal(JSON.parse(fs.readFileSync(path.join(root, 'temp/telegram-publisher-test-media/download-attempt-' + (base + id) + '.json'), 'utf8')), attempts);
     const partial = await send(photo(70, 'partial-error')); assert.equal(partial.status, 'partial'); assert.match(partial.text, /Facebook test rejection/); assert.match(partial.text, /Instagram.*Đã đăng/);
-    const network = await send(photo(80, 'network-error')); assert.equal(network.status, 'partial'); assert.match(network.text, /Không xác nhận/); assert.equal(await count(), afterAlbum + 8, 'Failed mutation must not retry');
+    const network = await send(photo(80, 'network-error')); assert.equal(network.status, 'partial'); assert.match(network.text, /Không xác nhận/); assert.equal(await count(), afterAlbum + 12, 'Failed mutation must not retry');
     await settings(['facebook', 'instagram', 'threads']);
-    const missing = await send(photo(90, 'missing channels')); assert.equal(missing.status, 'partial'); assert.match(missing.text, /Chưa kết nối trong Buffer/); assert.equal(await count(), afterAlbum + 9);
+    const missing = await send(photo(90, 'missing channels')); assert.equal(missing.status, 'partial'); assert.match(missing.text, /Chưa kết nối trong Buffer/); assert.equal(await count(), afterAlbum + 13);
     await settings([]);
     for (const [index, length] of [498, 499, 500, 501].entries()) {
       const caption = '💌'.repeat(length);
@@ -162,6 +169,6 @@ if (process.argv.includes('--prepare')) {
     const quiet = await first; assert.equal(quiet.status, 'sent');
     for (const c of (await stats()).calls.filter(c => c.text === 'Quiet period')) assert.equal(c.assets.length, 2);
     assert.ok((await stats()).maxActive > 1, 'Channel publishing requests must overlap');
-    console.log('PASS real n8n: Facebook post metadata, Threads 498/499 allowed and 500/501 skipped (Unicode), long album skips only Threads, status without repost, album ordering/dedup, media preparation, concurrent channels, partial errors, missing connections, photo/video + AI.');
+    console.log('PASS real n8n: per-file download retries (middle image recovers on attempt 3, permanent failure blocks album), Facebook post metadata, Threads 498/499 allowed and 500/501 skipped (Unicode), long album skips only Threads, status without repost, album ordering/dedup, concurrent channels, partial errors, missing connections, photo/video + AI.');
   })().catch(error => { console.error(error); process.exitCode = 1; });
 }

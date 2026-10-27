@@ -25,7 +25,8 @@ const nodes = [
   node('Resolve Post', 'noOp', 1, {}),
   node('Telegram Accepted', 'telegram', 1.2, { resource: 'message', operation: 'sendMessage', chatId: '={{ $json.chatId }}', text: "={{ 'Đã nhận bài, đang gửi đăng lên các nền tảng đã kết nối. Bot sẽ báo kết quả từng kênh tại đây.' + (" + JSON.stringify(config.services.includes('threads')) + " && Array.from($json.caption).length > 499 ? '\\nLưu ý: caption có ' + Array.from($json.caption).length + ' ký tự, vượt mức tối đa 499 ký tự đã cấu hình. Bot sẽ bỏ qua Threads, không gửi đăng lên Threads. Các nền tảng khác vẫn tiếp tục.' : '') }}", replyMarkup: 'none', additionalFields: replyFields }, { onError: 'continueRegularOutput' }),
   node('Expand Media', 'code', 2, { jsCode: "const context = $('Resolve Post').first().json; return context.media.map((medium) => ({ json: { ...context, ...medium }, pairedItem: { item: 0 } }));" }),
-  node('Download Media', 'telegram', 1.2, { resource: 'file', operation: 'get', fileId: '={{ $json.fileId }}', download: true, additionalFields: {} }, { onError: 'continueRegularOutput' }),
+  node('Download Each Media', 'splitInBatches', 3, { batchSize: 1, options: {} }),
+  node('Download Media', 'telegram', 1.2, { resource: 'file', operation: 'get', fileId: '={{ $json.fileId }}', download: true, additionalFields: {} }, { onError: 'continueRegularOutput', retryOnFail: true, maxTries: 3, waitBetweenTries: 2000 }),
   node('Prepare Media', 'code', 2, { jsCode: inject('telegram-multi-prepare') }, { onError: 'continueErrorOutput' }),
   node('Store Media', 'readWriteFile', 1.1, { operation: 'write', fileName: '={{ $json.localFile }}', dataPropertyName: 'media', options: {} }, { onError: 'continueRegularOutput' }),
   node('Assemble Media', 'code', 2, { jsCode: "const context = $('Resolve Post').first().json; const items = $input.all(); if (items.length !== context.media.length || items.some((item) => item.json.error || !item.json.asset)) throw new Error('Chưa lưu đủ ảnh/video. Không đăng album thiếu ảnh.'); return [{ json: { ...context, assets: items.map((item) => item.json.asset), metadata: context.media[0].mediaType === 'video' ? { tiktok: { isAiGenerated: context.isAiGenerated } } : {} } }];" }, { onError: 'continueErrorOutput' }),
@@ -52,11 +53,12 @@ Object.assign(nodes.find((item) => item.name === 'Video Download').parameters, {
 const connections = {};
 const link = (from, to, output = 0) => { connections[from] ??= { main: [] }; connections[from].main[output] = [{ node: to, type: 'main', index: 0 }]; };
 for (const sequence of [
-  ['Telegram Trigger', 'Telegram Intake', 'Is Album', 'Wait For Album', 'Collect Album', 'Album Ready', 'Should Publish', 'Resolve Post', 'Telegram Accepted', 'Expand Media', 'Download Media', 'Prepare Media', 'Store Media', 'Assemble Media', 'Read Buffer Account', 'Read Buffer Channels', 'Build Targets', 'Should Create Targets', 'Publish Channels', 'Parse Publish Result', 'Record Targets', 'Summarize Results', 'Still Processing', 'Wait For Buffer', 'Build Status Requests', 'Has Status Requests', 'Read Post Status', 'Parse Status Result', 'Record Targets'],
+  ['Telegram Trigger', 'Telegram Intake', 'Is Album', 'Wait For Album', 'Collect Album', 'Album Ready', 'Should Publish', 'Resolve Post', 'Telegram Accepted', 'Expand Media', 'Download Each Media', 'Prepare Media', 'Store Media', 'Assemble Media', 'Read Buffer Account', 'Read Buffer Channels', 'Build Targets', 'Should Create Targets', 'Publish Channels', 'Parse Publish Result', 'Record Targets', 'Summarize Results', 'Still Processing', 'Wait For Buffer', 'Build Status Requests', 'Has Status Requests', 'Read Post Status', 'Parse Status Result', 'Record Targets'],
   ['Report Preparation Failure', 'Summarize Results'],
   ['Video Download', 'Check Media Link', 'Read Video', 'Send Video'],
 ]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
 link('Is Album', 'Should Publish', 1); link('Album Ready', 'Wait For Album', 1);
+link('Download Each Media', 'Download Media', 1); link('Download Media', 'Download Each Media');
 link('Should Publish', 'Is Status Request', 1); link('Is Status Request', 'Build Status Requests'); link('Is Status Request', 'Telegram Reply', 1);
 link('Should Create Targets', 'Summarize Results', 1); link('Has Status Requests', 'Summarize Results', 1);
 link('Still Processing', 'Telegram Reply', 1); link('Video Download', 'Check Media Link', 1);

@@ -8,6 +8,8 @@
 > Runtime test riêng PASS album 10 ảnh, 4 kênh song song, lỗi từng kênh và chống lặp.
 > Sửa Facebook thiếu loại bài `post`; Threads cảnh báo và bỏ qua trước API từ 500 ký tự,
 > cho đăng tối đa 499 ký tự. Runtime test riêng PASS mốc 498/499/500/501, emoji và album dài.
+> Sửa lỗi kết nối Telegram gián đoạn khi tải ảnh giữa album: tải từng file, thử tối đa
+> 3 lần cách 2 giây; test xác nhận phục hồi đúng thứ tự và không đăng album còn thiếu ảnh.
 > Xem [luồng hiện tại](docs/TELEGRAM_PUBLISHER.md). Các trạng thái dưới đây là lịch sử.
 
 Cập nhật: 27/10/2026, giờ Việt Nam (UTC+7).
