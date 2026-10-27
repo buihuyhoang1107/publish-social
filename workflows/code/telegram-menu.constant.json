@@ -18,5 +18,10 @@
     "INSPIRATION": "Cảm hứng",
     "TUTORIAL": "Hướng dẫn",
     "COMPARISON": "So sánh"
+  },
+  "previewActions": {
+    "APPROVE": "Duyệt",
+    "EDIT": "Sửa",
+    "CANCEL": "Hủy"
   }
 }

@@ -17,15 +17,17 @@ if (process.argv.includes('--prepare')) {
   w.connections['Runtime Webhook'] = { main: [[{ node: 'Telegram Trigger', type: 'main', index: 0 }]] };
   for (const n of w.nodes) {
     if (n.name === 'Ensure Sessions Table') n.parameters.tableName = 'social_publisher_menu_test';
+    if (n.name === 'Ensure Posts Table') n.parameters.tableName = 'social_publisher_approval_test';
     if (n.name === 'Answer Callback') {
       n.type = 'n8n-nodes-base.noOp'; n.typeVersion = 1; n.parameters = {};
     }
-    if (['Telegram Menu Reply', 'Service Options', 'Content Type Options'].includes(n.name)) {
+    if (['Telegram Menu Reply', 'Service Options', 'Content Type Options', 'Preview Actions'].includes(n.name)) {
       n.type = 'n8n-nodes-base.set'; n.typeVersion = 3.4;
       n.parameters = { assignments: { assignments: [
         { id: 'reply', name: 'reply', type: 'string', value: "={{ $('Telegram Menu Router').first().json.textHtml }}" },
         { id: 'post', name: 'post', type: 'object', value: "={{ $('Telegram Menu Router').first().json.masterPost }}" },
         { id: 'keyboard', name: 'keyboard', type: 'object', value: "={{ $('Telegram Menu Router').first().json.keyboard }}" },
+        { id: 'archive', name: 'archiveRequested', type: 'boolean', value: "={{ $('Telegram Menu Router').first().json.archiveApprovedPost }}" },
       ] }, options: {} };
     }
   }
@@ -55,6 +57,22 @@ if (process.argv.includes('--prepare')) {
     assert.equal(reply.post.contentType, 'FEATURE');
     assert.equal(reply.post.status, 'DRAFT');
     assert.ok(reply.reply.includes('&lt;online&gt; &amp;'));
+    assert.equal(reply.keyboard.rows.length, 3);
+    const draftId = reply.post.postId;
+    const oldApproval = pick(reply, ':action:APPROVE');
+    reply = await send(click(pick(reply, ':action:EDIT')));
+    reply = await send(click(oldApproval));
+    assert.equal(reply.archiveRequested, false);
+    reply = await send(message('Nội dung sửa trên runtime'));
+    assert.equal(reply.post.postId, draftId);
+    assert.equal(reply.post.status, 'DRAFT');
+    const approve = pick(reply, ':action:APPROVE');
+    reply = await send(click(approve));
+    assert.equal(reply.post.status, 'APPROVED');
+    assert.equal(reply.archiveRequested, true);
+    assert.equal(reply.post.approvedBy, 456);
+    reply = await send(click(approve));
+    assert.equal(reply.archiveRequested, false);
     await send(message('/new'));
     reply = await send(click(oldButton));
     assert.ok(reply.reply.includes('phiên cũ'));
@@ -66,6 +84,14 @@ if (process.argv.includes('--prepare')) {
     reply = await send({ message: { ...message(undefined, 789).message, photo: [{ file_id: 'runtime-photo' }], caption: 'Demo ảnh' } });
     assert.equal(reply.post.telegramFileId, 'runtime-photo');
     assert.equal(reply.post.mediaType, 'IMAGE');
-    console.log('PASS real n8n HTTP executions: Data Table create/reuse, get/upsert, Code runner, both If branches, persistent selections, preview, stale callbacks, cancel, separate users, photo metadata.');
+    reply = await send(click(pick(reply, ':action:EDIT'), 789));
+    reply = await send(message('Sửa caption, giữ ảnh', 789));
+    assert.equal(reply.post.telegramFileId, 'runtime-photo');
+    const cancelApprove = pick(reply, ':action:APPROVE');
+    reply = await send(click(pick(reply, ':action:CANCEL'), 789));
+    reply = await send(click(cancelApprove, 789));
+    assert.equal(reply.archiveRequested, false);
+    assert.equal(reply.post.status, undefined);
+    console.log('PASS real n8n HTTP: menu, preview actions, archive approval, edit/reapproval, cancel, stale/duplicate clicks, independent sessions and retained media.');
   })().catch((error) => { console.error(error); process.exitCode = 1; });
 }

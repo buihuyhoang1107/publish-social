@@ -1,4 +1,4 @@
-# Setup status — Phase 1 và menu V2
+# Setup status — Telegram menu và duyệt bản nháp
 
 Cập nhật: 27/10/2026, giờ Việt Nam (UTC+7).
 
@@ -19,11 +19,14 @@ Cập nhật: 27/10/2026, giờ Việt Nam (UTC+7).
 | Telegram V1 | PASS theo ảnh và xác nhận người dùng — bot trả preview và DRAFT sau Publish |
 | Menu V2 offline | PASS — `node scripts/check-menu-workflow.cjs`, lựa chọn, state riêng, TTL, duplicate/stale update, media, HTML/Unicode |
 | Menu V2 runtime | PASS — instance n8n tạm 5680 chạy Data Table + Code + If qua các HTTP executions riêng; session giữ đúng sau restart |
-| Menu V2 native keyboard | PASS — kiểm tra n8n normalization, expression engine và Telegram reply_markup, đúng 7/9 nút và callback |
-| Menu V2 deployed | PASS — workflow Telegram Menu đã cập nhật thành 12 node và Published, giữ credential references |
+| Native keyboard | PASS — n8n normalization, expressions, Telegram reply_markup: 7/9 options và 3 nút preview |
+| Workflow deployed | Đã publish bản duyệt với 17 node trên cùng workflow, giữ credential references |
 | Menu V2 Telegram /new | PASS theo xác nhận người dùng — đã thấy các nút lựa chọn sau khi sửa lỗi fixedCollection expression |
-| Menu V2 Telegram callback và preview | Đang kiểm tra — người dùng đang chọn loại/dạng và gửi nội dung |
-| Approval và Social APIs | Chưa triển khai — phase sau |
+| Menu V2 Telegram callback và preview | PASS theo ảnh — WEDDING/VIRAL, đúng nội dung, DRAFT |
+| Approval runtime | PASS — Duyệt/Sửa/Hủy, sửa giữ media/post ID, nút cũ, duyệt lặp và lưu Data Table riêng |
+| Approval archive | PASS — bảng test chỉ có 1 bài APPROVED sau duyệt lặp và /new; bài hủy không được lưu |
+| Approval Telegram | Người dùng xác nhận đã thấy Duyệt/Sửa/Hủy, đang thử thao tác |
+| Social APIs | Chưa triển khai — Facebook Page là bước tiếp theo sau approval đạt |
 
 Workflow V2 đã có sẵn: [mở trong n8n](http://localhost:5678/workflow/seKtuQgWny3K7y5m).
 Không import lại nếu đang dùng instance này. File JSON vẫn được cung cấp để kiểm
@@ -51,6 +54,6 @@ Không cần cài cloudflared toàn hệ thống; dùng `tools/cloudflared.exe` 
 [hướng dẫn](docs/TELEGRAM_SETUP.md). Portable tải từ
 [release Cloudflare 2026.10.4](https://github.com/cloudflare/cloudflared/releases/tag/2026.10.4).
 
-Bước tiếp theo: chọn loại thiệp và dạng nội dung bằng nút trên Telegram,
-gửi text rồi xác nhận preview đúng lựa chọn và `DRAFT`. V2 đã Published, không cần
-bấm Execute. Xem [hướng dẫn menu](docs/TELEGRAM_MENU.md).
+Bước tiếp theo: gửi `/preview` để mở bài hiện tại kèm nút. Thử Sửa → gửi nội dung
+mới → Duyệt, xác nhận `APPROVED`. Bài được lưu, chưa đăng lên mạng xã hội.
+Workflow đã Published, không cần Execute. Xem [hướng dẫn](docs/TELEGRAM_MENU.md).

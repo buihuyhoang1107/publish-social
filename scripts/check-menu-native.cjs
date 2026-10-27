@@ -14,12 +14,14 @@ const run = (update, previous) => JSON.parse(JSON.stringify(vm.runInNewContext(`
 })[0].json));
 const service = run({ update_id: 100, message: { chat: { id: 1, type: 'private' }, from: { id: 1 }, text: '/new' } });
 const type = run({ update_id: 101, callback_query: { from: { id: 1 }, data: 'sp:2s:service:WEDDING', message: { chat: { id: 1, type: 'private' } } } }, service);
+const content = run({ update_id: 102, callback_query: { from: { id: 1 }, data: 'sp:2s:type:FEATURE', message: { chat: { id: 1, type: 'private' } } } }, type);
+const preview = run({ update_id: 103, message: { message_id: 4, chat: { id: 1, type: 'private' }, from: { id: 1 }, text: 'Native approval test' } }, content);
 const workflow = new Workflow({ id: 'native-menu-test', nodes: spec.nodes, connections: spec.connections, active: false,
   nodeTypes: { getByNameAndVersion: (name) => name === 'n8n-nodes-base.telegram' ? new Telegram() : {
     description: { name, properties: [], version: 1, inputs: ['main'], outputs: ['main'] },
   } },
 });
-for (const [name, reply, expectedRows] of [['Service Options', service, 7], ['Content Type Options', type, 9]]) {
+for (const [name, reply, expectedRows] of [['Service Options', service, 7], ['Content Type Options', type, 9], ['Preview Actions', preview, 3]]) {
   const node = workflow.getNode(name);
   assert.equal(typeof node.parameters.inlineKeyboard, 'object');
   assert.equal(node.parameters.inlineKeyboard.rows.length, expectedRows, 'Keyboard must survive n8n normalization');
@@ -39,4 +41,4 @@ for (const [name, reply, expectedRows] of [['Service Options', service, 7], ['Co
     assert.equal(actual.callback_data, expected.additionalFields.callback_data);
   }
 }
-console.log('PASS native n8n normalization, expression engine and Telegram reply_markup: 7 service options and 9 content options with correct callbacks. No Telegram API called.');
+console.log('PASS native n8n normalization, expressions, Telegram reply_markup: 7 services, 9 content types, 3 preview actions. No Telegram API called.');

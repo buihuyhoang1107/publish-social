@@ -1,4 +1,4 @@
-# Telegram menu V2
+# Telegram menu và duyệt bản nháp
 
 ## Cách dùng trên instance hiện tại
 
@@ -12,13 +12,25 @@ production.
 3. Chọn một trong 9 dạng nội dung.
 4. Gửi text, hoặc **một** ảnh/video có caption.
 5. Bot trả `PREVIEW BAI DANG`, loại thiệp/dạng đã chọn, nội dung và `DRAFT`.
+6. Bấm **Duyệt**, **Sửa** hoặc **Hủy** dưới preview.
 
-`/start` cũng mở menu. `/cancel` xóa phiên/bản nháp hiện tại. `/new` thay phiên cũ;
+**Duyệt:** lưu nguyên nội dung hiện tại thành `APPROVED`, kèm thời gian và Telegram
+user ID người duyệt. Bot xác nhận đã lưu; chưa đăng lên Facebook hay mạng xã hội.
+**Sửa:** giữ loại thiệp/dạng nội dung, nhận lại nội dung và tạo preview `DRAFT` mới.
+Gửi text khi sửa sẽ giữ ảnh/video hiện có; gửi file mới có caption để thay file.
+**Hủy:** bỏ bản nháp hiện tại. Nút của preview cũ không thể duyệt bài đã sửa/hủy.
+
+Gửi `/preview` để mở lại bản nháp hiện tại kèm nút; áp dụng cả bài đã tạo từ V2.
+Không cần nhập lại nội dung sau khi cập nhật workflow. Mỗi lần mở lại preview làm
+hết hiệu lực nút ở preview trước. Sau khi duyệt, nút cũ không tạo thêm lần duyệt.
+
+`/start` cũng mở menu. `/cancel` xóa phiên/bản nháp hiện tại, không xóa bài đã duyệt
+trong bảng lưu riêng. `/new` thay phiên cũ;
 nút cũ được báo hết hiệu lực. Phiên tồn tại 24 giờ sau lần tương tác gần nhất.
-V2 lưu một phiên và bản nháp mới nhất cho mỗi người dùng trong chat riêng, chưa
-phải lịch sử nhiều bài. Sau preview, dùng `/new` để tạo bài khác.
+Bot lưu một phiên và bản nháp mới nhất cho mỗi người dùng trong chat riêng.
+Bài đã duyệt được lưu riêng, không mất khi `/new` hoặc khi phiên hết hạn.
 
-Chưa có duyệt, sửa, hủy bằng inline button hoặc publisher social. `DRAFT` và `YES`
+Chưa có publisher social. `DRAFT`, `APPROVED` và `YES`
 trong preview chưa xác nhận nội dung đã được đăng. Album, document và chat nhóm
 chưa được hỗ trợ; gửi từng ảnh/video bằng chức năng media của Telegram.
 Nếu Telegram gửi lỗi và không thấy phản hồi, kiểm tra execution trong n8n;
@@ -31,9 +43,10 @@ Telegram Trigger (message + callback_query)
   → Ensure Sessions Table
   → Load Session
   → Telegram Menu Router
+  → Nếu Duyệt: Ensure Posts Table → Store Approved Post
   → Save Session
   → Is Callback → Answer Callback (nếu là nút)
-  → Chọn nhánh Service Options / Content Type Options / Telegram Menu Reply
+  → Chọn nhánh Service Options / Content Type Options / Preview Actions / Telegram Menu Reply
 ```
 
 Data Table `social_publisher_sessions` được tạo khi nhận update đầu tiên, gồm
@@ -41,8 +54,14 @@ Data Table `social_publisher_sessions` được tạo khi nhận update đầu t
 không thêm database ngoài. Phiên hết hạn bị thay thế ở lần tương tác tiếp theo,
 không có lịch xóa tự động. Có thể xem bảng trong tab Data tables của project.
 
+Bảng `social_publisher_posts` được tạo khi duyệt lần đầu, gồm `postId`, `status`,
+`postJson`, `chatId`. Upsert theo `postId` tránh tạo bản lưu trùng khi gửi lại thao
+tác. Bài được lưu trước khi ghi phiên APPROVED và trước khi gửi xác nhận Telegram;
+nếu lưu lỗi, phiên vẫn chờ duyệt để thử lại. Bảng này chưa có lịch xóa tự động.
+Không có node nào đăng mạng xã hội trong workflow hiện tại.
+
 Master Post trong `sessionJson.post` giữ nội dung đầy đủ, taxonomy đã chọn,
-`goal=LEAD`, `status=DRAFT`, platforms và thông tin media. Ảnh/video lưu
+`goal=LEAD`, `status=DRAFT` hoặc `APPROVED`, platforms và thông tin media. Ảnh/video lưu
 `telegramFileId`; `mediaPath` để trống vì không có đường dẫn local hoặc URL public.
 Các trường `topic`, `hook`, `cta` để trống, không tự suy đoán nội dung. Preview rút
 gọn nội dung dài và báo rõ; HTML được escape để giữ nguyên ký tự người dùng.
@@ -81,7 +100,7 @@ node scripts/check-menu-workflow.cjs
 
 JSON tạo ra không có credential, luôn inactive để import vào instance mới an toàn.
 Khi cài instance mới, chọn cùng credential ở Trigger và tất cả node Telegram
-(Answer Callback, Service Options, Content Type Options, Menu Reply).
+(Answer Callback, Service Options, Content Type Options, Preview Actions, Menu Reply).
 Chỉ một workflow được dùng bot này tại một thời điểm.
 
 Các nút được khai báo bằng object/array `fixedCollection`; chỉ `callback_data` của
@@ -97,7 +116,8 @@ docker compose exec -T n8n node /tmp/check-menu-native.cjs /tmp/menu-options-che
 ```
 
 Lệnh kiểm tra n8n Workflow normalization, expression engine và hàm Telegram tạo
-`reply_markup`, xác nhận đúng 7/9 nút và callback, không gọi Telegram API.
+`reply_markup`, xác nhận đúng 7/9 nút lựa chọn và 3 nút preview cùng callback,
+không gọi Telegram API.
 
 Runtime test dùng **instance tạm riêng** trên loopback 5680, table riêng, không có
 credential Telegram và thay các node gọi Telegram bằng node local:
@@ -114,5 +134,8 @@ Kiểm tra này thực thi Data Table create/get/upsert, Code runner, If branche
 expressions qua HTTP trên n8n thật. CLI `n8n execute` không khởi tạo Data Table
 module trong phiên bản đang dùng, nên không dùng CLI execution để kết luận test
 Data Tables. Test runtime đã đạt, gồm kiểm tra phiên vẫn đúng sau restart container.
-Telegram keyboard đã được người dùng xác nhận hiển thị; callback và preview cuối
-vẫn đang được kiểm tra trên bot.
+Menu, callback chọn loại/dạng và preview đã được người dùng xác nhận bằng ảnh
+WEDDING/VIRAL/DRAFT. Các nút Duyệt/Sửa/Hủy cũng đã được xác nhận hiển thị;
+người dùng đang kiểm tra thao tác thật. Runtime đã kiểm tra archive APPROVED,
+sửa/duyệt lại, giữ media, hủy, nút cũ và duyệt lặp; bảng test chỉ có một bài APPROVED
+sau toàn bộ thao tác, bài hủy không được lưu vào bảng bài đã duyệt.

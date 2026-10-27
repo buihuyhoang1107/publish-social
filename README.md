@@ -1,14 +1,15 @@
 # Social Publisher — Telegram + n8n
 
 Triển khai theo [flow gốc](SOCIAL_PUBLISHER_TELEGRAM_N8N.md), từng phase.
-Phase hiện tại: **V2 — /new → loại thiệp → dạng nội dung → bài → preview**.
-V1 đã được người dùng xác nhận trên Telegram sau Publish. V2 đã triển khai trên
-instance local, người dùng đã xác nhận thấy nút chọn; đang kiểm tra callback và preview cuối. Chưa có nút duyệt
-hoặc tích hợp social; không đăng bài tự động.
+Phase hiện tại: **/new → loại thiệp → dạng nội dung → bài → preview → Duyệt/Sửa/Hủy**.
+Menu và preview đã được người dùng xác nhận trên Telegram. Các nút duyệt đã
+triển khai và người dùng đang kiểm tra. Bài duyệt lưu thành `APPROVED` trong n8n;
+chưa tích hợp social, không đăng bài tự động.
 
 Trong instance hiện tại, [workflow](http://localhost:5678/workflow/seKtuQgWny3K7y5m)
 đã cập nhật thành **Social Publisher - Telegram Menu**, dùng credential cũ.
-Gửi `/new` trong chat riêng với bot để bắt đầu, `/cancel` để hủy.
+Gửi `/new` trong chat riêng với bot để bắt đầu, `/preview` để mở lại bài và các nút,
+`/cancel` để hủy bản nháp.
 Không cần import lại hay bấm Execute. Xem [menu V2](docs/TELEGRAM_MENU.md).
 
 ## Chạy trên Windows
@@ -56,7 +57,7 @@ dự kiến, không phải kết quả đăng bài.
 Tình trạng môi trường và kiểm tra thật nằm ở [SETUP_STATUS.md](SETUP_STATUS.md).
 Lệnh `check-workflow.cjs` chỉ kiểm tra V1 offline; không thay test n8n và Telegram thật.
 Kiểm tra V2: `node scripts/check-menu-workflow.cjs`. Quy trình runtime test trong
-[menu V2](docs/TELEGRAM_MENU.md). Chỉ làm approval sau khi menu đạt, rồi Facebook Page,
+[menu và duyệt](docs/TELEGRAM_MENU.md). Sau khi kiểm tra duyệt đạt, làm Facebook Page,
 Instagram, Threads và TikTok Draft lần lượt, mỗi nền tảng có test riêng.
 
 Contract node đối chiếu với [source Telegram Trigger](https://github.com/n8n-io/n8n/blob/master/packages/nodes-base/nodes/Telegram/TelegramTrigger.node.ts)

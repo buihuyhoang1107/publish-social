@@ -25,10 +25,10 @@ const nodes = [
   node('Telegram Menu Router', 'code', 2, [720, 0], { mode: 'runOnceForAllItems', jsCode: routerCode }),
   node('Save Session', 'dataTable', 1.1, [960, 0], {
     resource: 'row', operation: 'upsert', dataTableId: tableId, matchType: 'allConditions',
-    filters: filter('={{ $json.sessionKey }}'),
+    filters: filter("={{ $('Telegram Menu Router').first().json.sessionKey }}"),
     columns: {
       mappingMode: 'defineBelow',
-      value: { sessionKey: '={{ $json.sessionKey }}', sessionJson: '={{ $json.sessionJson }}' },
+      value: { sessionKey: "={{ $('Telegram Menu Router').first().json.sessionKey }}", sessionJson: "={{ $('Telegram Menu Router').first().json.sessionJson }}" },
       schema: ['sessionKey', 'sessionJson'].map((id) => ({ id, displayName: id, required: false, defaultMatch: false, display: true, type: 'string', canBeUsedToMatch: true })),
     }, options: {},
   }),
@@ -64,21 +64,54 @@ nodes.push(
   node('Service Options', 'telegram', 1.2, [1920, -180], menuReply(menuOptions.services, 'service')),
   node('Is Content Type Menu', 'if', 2.2, [1920, 120], menuCondition('type')),
   node('Content Type Options', 'telegram', 1.2, [2160, 20], menuReply(menuOptions.contentTypes, 'type')),
+  node('Is Preview', 'if', 2.2, [2160, 220], menuCondition('action')),
+  node('Preview Actions', 'telegram', 1.2, [2400, 120], menuReply(menuOptions.previewActions, 'action')),
+  node('Should Store Approval', 'if', 2.2, [960, -360], {
+    conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 },
+      conditions: [{ id: 'approved', leftValue: '={{ $json.archiveApprovedPost }}', rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' }, options: {},
+  }),
+  node('Ensure Posts Table', 'dataTable', 1.1, [1200, -460], {
+    resource: 'table', operation: 'create', tableName: 'social_publisher_posts',
+    columns: { column: ['postId', 'status', 'postJson'].map((name) => ({ name, type: 'string' })).concat([{ name: 'chatId', type: 'number' }]) },
+    options: { createIfNotExists: true },
+  }),
+  node('Store Approved Post', 'dataTable', 1.1, [1440, -460], {
+    resource: 'row', operation: 'upsert',
+    dataTableId: { __rl: true, mode: 'id', value: "={{ $('Ensure Posts Table').first().json.id }}" },
+    matchType: 'allConditions', filters: { conditions: [{ keyName: 'postId', condition: 'eq', keyValue: "={{ $('Telegram Menu Router').first().json.masterPost.postId }}" }] },
+    columns: {
+      mappingMode: 'defineBelow', value: {
+        postId: "={{ $('Telegram Menu Router').first().json.masterPost.postId }}",
+        status: "={{ $('Telegram Menu Router').first().json.masterPost.status }}",
+        postJson: "={{ JSON.stringify($('Telegram Menu Router').first().json.masterPost) }}",
+        chatId: "={{ $('Telegram Menu Router').first().json.chatId }}",
+      },
+      schema: ['postId', 'status', 'postJson', 'chatId'].map((id) => ({ id, displayName: id, required: false, defaultMatch: false, display: true, type: id === 'chatId' ? 'number' : 'string', canBeUsedToMatch: true })),
+    }, options: {},
+  }),
 );
-nodes[7].position = [2160, 220];
+nodes[7].position = [2400, 320];
 const connections = {};
 const link = (from, to, output = 0) => {
   connections[from] ??= { main: [] };
   connections[from].main[output] = [{ node: to, type: 'main', index: 0 }];
 };
-for (let i = 0; i < 5; i++) link(nodes[i].name, nodes[i + 1].name);
+for (let i = 0; i < 3; i++) link(nodes[i].name, nodes[i + 1].name);
+link('Telegram Menu Router', 'Should Store Approval');
+link('Should Store Approval', 'Ensure Posts Table');
+link('Should Store Approval', 'Save Session', 1);
+link('Ensure Posts Table', 'Store Approved Post');
+link('Store Approved Post', 'Save Session');
+link('Save Session', 'Is Callback');
 link('Is Callback', 'Answer Callback');
 link('Is Callback', 'Is Service Menu', 1);
 link('Answer Callback', 'Is Service Menu');
 link('Is Service Menu', 'Service Options');
 link('Is Service Menu', 'Is Content Type Menu', 1);
 link('Is Content Type Menu', 'Content Type Options');
-link('Is Content Type Menu', 'Telegram Menu Reply', 1);
+link('Is Content Type Menu', 'Is Preview', 1);
+link('Is Preview', 'Preview Actions');
+link('Is Preview', 'Telegram Menu Reply', 1);
 const workflow = { name: 'Social Publisher - Telegram Menu', nodes, connections,
   settings: { executionOrder: 'v1', timezone: 'Asia/Ho_Chi_Minh' }, active: false, pinData: {}, tags: [] };
 fs.writeFileSync(path.join(root, 'workflows/telegram-menu.json'), JSON.stringify(workflow, null, 2) + '\n');
