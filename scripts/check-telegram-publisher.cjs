@@ -6,6 +6,12 @@ const root = path.resolve(__dirname, '..');
 const services = ['tiktok', 'facebook', 'instagram', 'threads'];
 if (process.argv.includes('--prepare')) {
   const w = JSON.parse(fs.readFileSync(path.join(root, 'workflows/telegram-publisher.json'), 'utf8'));
+  const accepted = w.nodes.find(n => n.name === 'Telegram Accepted').parameters.text;
+  const vm = require('node:vm');
+  for (const length of [498, 499, 500, 501]) {
+    const text = vm.runInNewContext('(' + accepted.slice(3, -2) + ')', { $json: { caption: '💌'.repeat(length) } });
+    assert.equal(text.includes('Bot sẽ bỏ qua Threads'), length > 499, 'Warn at receipt time before the publish route');
+  }
   const config = { allowedUserIds: [456], allowedChatIds: [456], services, albumQuietMs: 3000, publicBaseUrl: 'http://127.0.0.1:5678', mediaWebhookId: w.nodes.find(n => n.name === 'Video Download').webhookId };
   w.id = 'telegramPublisherTest'; w.versionId = require('node:crypto').randomUUID(); w.name = 'Telegram Multi Publisher Isolated Test';
   const trigger = w.nodes.find(n => n.name === 'Telegram Trigger');
@@ -49,7 +55,9 @@ if (process.argv.includes('--prepare')) {
         const call = { ...input, contents: [] }; calls.push(call);
         assert.ok(services.some(s => 'test-' + s === input.channelId));
         assert.equal(input.mode, 'shareNow'); assert.equal(input.schedulingType, 'automatic'); assert.equal(input.needsApproval, false); assert.equal(input.saveToDraft, false);
-        if (input.channelId !== 'test-tiktok' || input.assets[0].image) assert.deepEqual(input.metadata, {}, 'Platform/video-specific metadata must not leak to other post types');
+        if (input.channelId === 'test-facebook') assert.deepEqual(input.metadata, { facebook: { type: 'post' } });
+        else if (input.channelId !== 'test-tiktok' || input.assets[0].image) assert.deepEqual(input.metadata, {}, 'Platform/video-specific metadata must not leak to other post types');
+        if (input.channelId === 'test-threads') assert.ok(Array.from(input.text).length <= 499, 'Overlong captions must never reach the Threads API');
         for (const asset of input.assets) {
           const url = (asset.image ?? asset.video).url;
           const head = await fetch(url, { method: 'HEAD' }); assert.equal(head.status, 200);
@@ -127,6 +135,26 @@ if (process.argv.includes('--prepare')) {
     await settings(['facebook', 'instagram', 'threads']);
     const missing = await send(photo(90, 'missing channels')); assert.equal(missing.status, 'partial'); assert.match(missing.text, /Chưa kết nối trong Buffer/); assert.equal(await count(), afterAlbum + 9);
     await settings([]);
+    for (const [index, length] of [498, 499, 500, 501].entries()) {
+      const caption = '💌'.repeat(length);
+      const beforeLimit = await count();
+      const result = await send(photo(300 + index, caption));
+      assert.equal(result.status, length <= 499 ? 'sent' : 'partial');
+      const created = (await stats()).calls.slice(beforeLimit);
+      assert.equal(created.length, length <= 499 ? 4 : 3);
+      assert.equal(created.some(c => c.channelId === 'test-threads'), length <= 499);
+      assert.ok(created.some(c => c.channelId === 'test-facebook'));
+      if (length > 499) assert.match(result.text, /Threads.*Bỏ qua, chưa gửi đăng.*499/);
+      const statusResult = await send(msg(310 + index, { text: '/status', reply_to_message: { message_id: base + 300 + index } }));
+      assert.equal(statusResult.status, result.status); assert.equal(await count(), beforeLimit + created.length);
+    }
+    const longAlbumCaption = 'ế'.repeat(501);
+    const beforeLongAlbum = await count();
+    const longAlbum = await Promise.all([send(photo(330, longAlbumCaption, 'long-' + base), true), send(photo(331, '', 'long-' + base), true)]);
+    assert.equal(longAlbum.find(r => r.status)?.status, 'partial');
+    const longAlbumCalls = (await stats()).calls.slice(beforeLongAlbum);
+    assert.equal(longAlbumCalls.length, 3);
+    assert.ok(longAlbumCalls.every(c => c.channelId !== 'test-threads' && c.assets.length === 2 && c.text === longAlbumCaption));
     const lateAlbum = 'quiet-' + base;
     const first = send(photo(100, 'Quiet period', lateAlbum), true);
     await new Promise(resolve => setTimeout(resolve, 4500));
@@ -134,6 +162,6 @@ if (process.argv.includes('--prepare')) {
     const quiet = await first; assert.equal(quiet.status, 'sent');
     for (const c of (await stats()).calls.filter(c => c.text === 'Quiet period')) assert.equal(c.assets.length, 2);
     assert.ok((await stats()).maxActive > 1, 'Channel publishing requests must overlap');
-    console.log('PASS real n8n: multi-photo album ordering, one post/channel, quiet period, album dedup + aliases, all-or-nothing media preparation, four concurrent channels, partial errors, missing connections, status without repost, single photo/video + AI.');
+    console.log('PASS real n8n: Facebook post metadata, Threads 498/499 allowed and 500/501 skipped (Unicode), long album skips only Threads, status without repost, album ordering/dedup, media preparation, concurrent channels, partial errors, missing connections, photo/video + AI.');
   })().catch(error => { console.error(error); process.exitCode = 1; });
 }

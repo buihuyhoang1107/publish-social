@@ -4,7 +4,7 @@ const context = $input.first().json;
 const saved = JSON.parse(fs.readFileSync(context.journalFile, 'utf8'));
 const targets = (saved.targets ?? []).map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));
 const labels = { tiktok: 'TikTok', facebook: 'Facebook Page', instagram: 'Instagram', threads: 'Threads' };
-const titles = { sent: 'Đã đăng', error: 'Đăng thất bại', rejected: 'Bị từ chối', unavailable: 'Chưa sẵn sàng', sending: 'Đang đăng', scheduled: 'Đang chờ đăng', submitting: 'Chưa xác nhận kết quả', unknown: 'Chưa xác nhận kết quả', draft: 'Bản nháp, chưa đăng', needs_approval: 'Cần duyệt, chưa đăng' };
+const titles = { sent: 'Đã đăng', error: 'Đăng thất bại', rejected: 'Bị từ chối', skipped: 'Bỏ qua, chưa gửi đăng', unavailable: 'Chưa sẵn sàng', sending: 'Đang đăng', scheduled: 'Đang chờ đăng', submitting: 'Chưa xác nhận kết quả', unknown: 'Chưa xác nhận kết quả', draft: 'Bản nháp, chưa đăng', needs_approval: 'Cần duyệt, chưa đăng' };
 const pending = targets.some((target) => target.postId && ['sending', 'scheduled', 'submitting'].includes(target.status));
 const text = context.preparationError ?? (targets.length ? 'Kết quả bài đăng:\n' + targets.map((target) => `${labels[target.service] ?? target.service}${target.channelName ? ' (' + target.channelName + ')' : ''}: ${titles[target.status] ?? target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\n' + target.externalLink : ''}`).join('\n\n') : context.failureMessage ?? 'Chưa có kết quả đăng.');
 const status = targets.length && targets.every((target) => target.status === 'sent') ? 'sent' : pending ? 'processing' : targets.some((target) => target.status === 'sent') ? 'partial' : 'error';

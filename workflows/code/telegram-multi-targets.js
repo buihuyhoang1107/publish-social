@@ -9,7 +9,9 @@ for (const service of publisherConfig.services) {
   for (const channel of channels.length ? channels : [{ id: 'missing-' + service, name: '', service, missing: true }]) {
     const targetFile = `/files/telegram-target-${crypto.createHash('sha256').update(context.journalFile + ':' + channel.id).digest('hex')}.json`;
     const blocked = channel.missing || channel.isDisconnected || channel.isLocked;
-    const target = { ...context, channelId: channel.id, channelName: channel.name, service, targetFile, shouldCreate: !blocked, status: blocked ? 'unavailable' : 'submitting', error: channel.missing ? 'Chưa kết nối trong Buffer.' : blocked ? 'Kênh bị ngắt kết nối hoặc bị khóa.' : undefined };
+    const captionLength = Array.from(context.caption).length;
+    const exceedsThreadsLimit = service === 'threads' && captionLength > 499;
+    const target = { ...context, channelId: channel.id, channelName: channel.name, service, targetFile, metadata: service === 'facebook' ? { facebook: { type: 'post' } } : service === 'tiktok' ? context.metadata : {}, shouldCreate: !blocked && !exceedsThreadsLimit, status: blocked ? 'unavailable' : exceedsThreadsLimit ? 'skipped' : 'submitting', error: channel.missing ? 'Chưa kết nối trong Buffer.' : blocked ? 'Kênh bị ngắt kết nối hoặc bị khóa.' : exceedsThreadsLimit ? `Caption có ${captionLength} ký tự, vượt mức tối đa 499 ký tự đã cấu hình. Chưa gửi đăng Threads; hãy rút gọn caption.` : undefined };
     try { fs.writeFileSync(targetFile, JSON.stringify(target), { flag: 'wx', mode: 0o600 }); }
     catch (error) { if (error.code !== 'EEXIST') throw error; target.shouldCreate = false; }
     targets.push(target);

@@ -35,7 +35,12 @@ Nguồn: [kết nối kênh](https://support.buffer.com/articles/connecting-your
 [gói Buffer](https://buffer.com/pricing).
 
 Nếu một kênh lỗi hoặc chưa kết nối, các kênh còn lại vẫn gửi đăng. Bot hiển thị lỗi
-từ API từng kênh. Giới hạn caption/media của mỗi nền tảng do Buffer/nền tảng kiểm tra;
+từ API từng kênh. Facebook gửi `metadata.facebook.type: post` cho bài ảnh/video.
+Threads được cấu hình tối đa **499 ký tự** (gồm khoảng trắng, xuống dòng, hashtag;
+đếm theo Unicode code point). Từ 500 ký tự trở lên, bot cảnh báo ngay lúc nhận bài,
+bỏ qua Threads trước khi gọi API; Facebook và các nền tảng khác vẫn tiếp tục.
+Áp dụng cho cả ảnh, video và album. `/status` hiển thị Threads đã bỏ qua, không tự đăng lại.
+Các giới hạn caption/media khác do Buffer/nền tảng kiểm tra;
 không tự cắt caption hay bỏ ảnh để ép đăng. Không bảo đảm bài hiển thị đúng cùng giây.
 
 Video tạo bằng AI: bắt đầu caption bằng `/ai`, ví dụ `/ai Mẫu thiệp cưới mới 💌`.
