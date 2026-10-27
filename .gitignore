@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+n8n_data/
+temp/
+downloads/
+tools/
+__pycache__/

@@ -1,0 +1,8 @@
+{
+  "chatId": 123456789,
+  "service": "WEDDING",
+  "content": "Thiep cuoi online giup khach de dang xem dia diem,\nRSVP va album anh ngay tren dien thoai.",
+  "contentType": "GENERAL",
+  "platforms": ["FACEBOOK", "INSTAGRAM", "THREADS", "TIKTOK"],
+  "status": "DRAFT"
+}

@@ -1,0 +1,64 @@
+{
+  "name": "Social Publisher - Telegram Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": ["message"],
+        "additionalFields": { "download": true }
+      },
+      "id": "7198c65a-0948-494d-b74f-481d48677621",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0],
+      "webhookId": "45fedb68-f12e-4939-9c02-8a51207da49b",
+      "notes": "Chọn Telegram credential. V1 nhận text; chưa xử lý media/album."
+    },
+    {
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            { "id": "chat-id", "name": "chatId", "type": "number", "value": "={{ $json.message.chat.id }}" },
+            { "id": "service", "name": "service", "type": "string", "value": "WEDDING" },
+            { "id": "content", "name": "content", "type": "string", "value": "={{ $json.message.text ?? '' }}" },
+            { "id": "content-type", "name": "contentType", "type": "string", "value": "GENERAL" },
+            { "id": "platforms", "name": "platforms", "type": "array", "value": "={{ ['FACEBOOK', 'INSTAGRAM', 'THREADS', 'TIKTOK'] }}" },
+            { "id": "status", "name": "status", "type": "string", "value": "DRAFT" }
+          ]
+        },
+        "includeOtherFields": false,
+        "options": {}
+      },
+      "id": "9f77b1f2-e514-4f48-a81f-684317fc2078",
+      "name": "Edit Fields - Master Post",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [280, 0],
+      "notes": "Contract tối thiểu V1 theo mục 15. GENERAL là mặc định V1; taxonomy/menu bổ sung ở V2."
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.content ? 'PREVIEW BAI DANG\\n\\nLoai: ' + $json.service + '\\nDang: ' + $json.contentType + '\\n\\nNoi dung:\\n' + ($json.content.length > 3200 ? $json.content.slice(0, 3200) + '\\n[Preview rut gon; Master Post giu nguyen noi dung.]' : $json.content) + '\\n\\nNen tang du kien (chua dang):\\n' + $json.platforms.map(platform => platform + ' YES').join('\\n') + '\\n\\nTrang thai: ' + $json.status : 'V1 chi nhan text. Hay gui noi dung bai dang bang tin nhan van ban; anh/video se duoc ho tro o phase sau.' }}",
+        "additionalFields": { "appendAttribution": false }
+      },
+      "id": "34d44636-a3d5-47bb-86d4-af46d59519a1",
+      "name": "Telegram Preview",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [560, 0],
+      "notes": "Chọn cùng credential với Trigger. Plain text, không bật Parse Mode. Không có publisher trong V1."
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": { "main": [[{ "node": "Edit Fields - Master Post", "type": "main", "index": 0 }]] },
+    "Edit Fields - Master Post": { "main": [[{ "node": "Telegram Preview", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "timezone": "Asia/Ho_Chi_Minh" },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

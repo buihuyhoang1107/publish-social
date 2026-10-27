@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bảng điều phối công việc Codex trong workspace Manu">
+  <title>Manu · Codex Workspace</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="logo">m.</span> manu<span class="brand-sub">WORKSPACE</span></a>
+    <div class="workspace-label">ĐIỀU PHỐI CODEX</div>
+    <nav aria-label="Điều hướng"><a class="active" href="#overview">◫ Tổng quan</a><a href="#team">◎ Vai trò & công việc</a><a href="#evidence">✓ Kiểm chứng</a><a href="#note">≡ Note tiếp tục</a></nav>
+    <div class="sidebar-bottom"><span class="dot"></span> Chạy trên máy của anh<p>Source hiện tại · Không bản sao</p><small>Trạng thái do phiên làm việc cập nhật. Không tự điều khiển tài khoản khác.</small></div>
+  </aside>
+  <main id="overview">
+    <header><div class="breadcrumb">manu <span>/</span> điều phối công việc</div><div class="connection"><span id="connection-dot" class="dot"></span><span id="connection">Đang kết nối…</span><button id="refresh" type="button">Làm mới ↻</button></div></header>
+    <div id="error" class="error" role="alert" hidden></div>
+    <section class="intro"><div><div class="eyebrow">CODEX CONTROL ROOM</div><h1>Công việc đang diễn ra.</h1><p>Một nơi để xem phương án, người phụ trách và kết quả có thể kiểm chứng.</p></div><span class="local-pill">LOCAL WORKSPACE</span></section>
+    <section class="task-panel"><div class="task-heading"><span class="eyebrow">MỤC TIÊU HIỆN TẠI</span><span id="task-status" class="badge">Chưa có task</span></div><h2 id="task-title">Chưa khởi tạo nhiệm vụ</h2><p id="task-goal">Các phiên báo tiến độ qua dashboard.py để bắt đầu.</p><div id="criteria" class="criteria"></div><div class="task-footer"><span id="task-id"></span><span id="last-update">Chưa có cập nhật</span></div></section>
+    <section class="metrics" aria-label="Thống kê"><div><span>Đang thực hiện</span><strong id="working-count">0</strong><small>vai trò đã báo trạng thái</small></div><div><span>Chờ xử lý</span><strong id="blocked-count">0</strong><small>vướng mắc được khai báo</small></div><div><span>Kiểm tra đạt</span><strong id="pass-count">0</strong><small id="check-detail">Chưa có bằng chứng kiểm tra</small></div><div><span>File liên quan</span><strong id="file-count">0</strong><small>trong phạm vi được giao</small></div></section>
+    <section id="team"><div class="section-heading"><div><h2>Vai trò & công việc</h2><p id="mode">Một phiên có thể thực hiện các vai trò tuần tự.</p></div><span class="subtle">Cập nhật tự động mỗi 3 giây</span></div><div id="roles" class="roles"></div></section>
+    <div class="two-columns"><section id="evidence" class="panel"><div class="section-heading"><h2>Kết quả để kiểm chứng</h2><span class="section-icon">↗</span></div><div class="tabs" role="group" aria-label="Loại bằng chứng"><button class="selected" data-tab="checks" type="button">Kiểm tra</button><button data-tab="files" type="button">File phụ trách</button><button data-tab="demos" type="button">Demo / liên kết</button></div><div id="evidence-list"></div></section><section class="panel"><div class="section-heading"><h2>Cập nhật gần đây</h2><span class="section-icon">◷</span></div><p class="subtle activity-note">Các mốc do phiên làm việc báo lại, không phải log terminal trực tiếp.</p><div id="events" class="events"></div></section></div>
+    <section id="note" class="panel note-panel"><div class="section-heading"><div><h2>Note tiếp tục công việc</h2><p>CURRENT.md · điểm tiếp nhận chung cho phiên sau</p></div><button id="toggle-note" type="button" aria-expanded="false">Xem note ↓</button></div><pre id="note-content" hidden></pre></section>
+    <footer><span>MANU / CODEX WORKSPACE</span><span id="sync-time">Chờ dữ liệu từ máy local</span></footer>
+  </main>
+  <dialog id="file-dialog"><div class="dialog-heading"><h2 id="file-title">Nội dung file</h2><button id="close-file" type="button" aria-label="Đóng file">Đóng ✕</button></div><pre id="file-content"></pre></dialog>
+</body>
+</html>
