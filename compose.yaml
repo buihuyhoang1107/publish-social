@@ -13,6 +13,7 @@ services:
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
       N8N_PROXY_HOPS: "1"
       N8N_DEFAULT_BINARY_DATA_MODE: filesystem
+      N8N_CONCURRENCY_PRODUCTION_LIMIT: "1"
     volumes:
       - n8n_data:/home/node/.n8n
 

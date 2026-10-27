@@ -1,5 +1,8 @@
 # Kết nối bot Telegram với n8n — Phase 1
 
+Hướng dẫn này dành cho thiết lập V1 từ đầu. Instance hiện tại đã cập nhật sang
+[menu V2](TELEGRAM_MENU.md); dùng workflow đang Published, không import lại V1.
+
 ## 1. BotFather và credentials
 
 Nếu đã có bot thì dùng bot hiện tại. Nếu chưa có: mở tài khoản Telegram chính thức

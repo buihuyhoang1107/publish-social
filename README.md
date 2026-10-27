@@ -1,8 +1,15 @@
 # Social Publisher — Telegram + n8n
 
 Triển khai theo [flow gốc](SOCIAL_PUBLISHER_TELEGRAM_N8N.md), từng phase.
-Phase hiện tại: **V1 — Telegram → Master Post → Preview**. Chưa tích hợp social,
-menu hay nút duyệt. Một tin nhắn tạo một bản nháp; không đăng bài tự động.
+Phase hiện tại: **V2 — /new → loại thiệp → dạng nội dung → bài → preview**.
+V1 đã được người dùng xác nhận trên Telegram sau Publish. V2 đã triển khai trên
+instance local, người dùng đã xác nhận thấy nút chọn; đang kiểm tra callback và preview cuối. Chưa có nút duyệt
+hoặc tích hợp social; không đăng bài tự động.
+
+Trong instance hiện tại, [workflow](http://localhost:5678/workflow/seKtuQgWny3K7y5m)
+đã cập nhật thành **Social Publisher - Telegram Menu**, dùng credential cũ.
+Gửi `/new` trong chat riêng với bot để bắt đầu, `/cancel` để hủy.
+Không cần import lại hay bấm Execute. Xem [menu V2](docs/TELEGRAM_MENU.md).
 
 ## Chạy trên Windows
 
@@ -17,7 +24,7 @@ menu hay nút duyệt. Một tin nhắn tạo một bản nháp; không đăng b
 
    Chỉ copy `.env` lần đầu, không ghi đè cấu hình đã có.
 3. Mở **http://localhost:5678**, tạo tài khoản owner của n8n.
-4. Làm tiếp [hướng dẫn Telegram](docs/TELEGRAM_SETUP.md): mở tunnel, cập nhật
+4. Khi cài instance mới, làm [hướng dẫn Telegram V1](docs/TELEGRAM_SETUP.md): mở tunnel, cập nhật
    `.env`, tạo Credential và import `workflows/telegram-intake.json`.
 5. Gửi bot `Test bai dang thiep cuoi online`. Kết quả cần thấy: `PREVIEW BAI DANG`,
    đúng nội dung, `WEDDING`, `GENERAL`, trạng thái `DRAFT`.
@@ -37,6 +44,7 @@ nâng cấp; tag `stable` có thể đổi phiên bản khi pull. Không tự n�
 Editor chỉ bind loopback; Quick Tunnel vẫn có thể công khai editor qua HTTPS,
 vì vậy phải tạo owner trước khi mở tunnel. Không chia sẻ mật khẩu hoặc token.
 
+Workflow V1 lưu ở `workflows/telegram-intake.json` để tham khảo bước khởi đầu.
 V1 nhận text; trigger bật tải file theo tài liệu gốc, nhưng chưa preview media,
 chưa gom album, chưa có lịch sử Master Post riêng. Tin nhắn không có text sẽ nhận
 hướng dẫn gửi text. Master Post giữ toàn bộ nội dung; preview dài được rút gọn có
@@ -46,8 +54,9 @@ dự kiến, không phải kết quả đăng bài.
 ## Kiểm tra và các phase sau
 
 Tình trạng môi trường và kiểm tra thật nằm ở [SETUP_STATUS.md](SETUP_STATUS.md).
-Lệnh kiểm tra Node chỉ kiểm tra workflow/expressions offline; không thay test n8n
-và Telegram thật. Chỉ làm menu/approval sau khi V1 đạt, rồi Facebook Page,
+Lệnh `check-workflow.cjs` chỉ kiểm tra V1 offline; không thay test n8n và Telegram thật.
+Kiểm tra V2: `node scripts/check-menu-workflow.cjs`. Quy trình runtime test trong
+[menu V2](docs/TELEGRAM_MENU.md). Chỉ làm approval sau khi menu đạt, rồi Facebook Page,
 Instagram, Threads và TikTok Draft lần lượt, mỗi nền tảng có test riêng.
 
 Contract node đối chiếu với [source Telegram Trigger](https://github.com/n8n-io/n8n/blob/master/packages/nodes-base/nodes/Telegram/TelegramTrigger.node.ts)

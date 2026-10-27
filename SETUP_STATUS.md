@@ -1,4 +1,4 @@
-# Setup status — Phase 1
+# Setup status — Phase 1 và menu V2
 
 Cập nhật: 27/10/2026, giờ Việt Nam (UTC+7).
 
@@ -16,11 +16,16 @@ Cập nhật: 27/10/2026, giờ Việt Nam (UTC+7).
 | Import workflow thật | PASS — `Social Publisher - Telegram Intake`; người dùng đã chọn Telegram account ở hai node |
 | Workflow offline | PASS — `node scripts/check-workflow.cjs`: Master Post, preview, text đặc biệt, preview dài và non-text |
 | n8n runtime | PASS — import và execute smoke workflow trên n8n 2.44.7, `status=success`; Edit Fields và biểu thức Preview tạo đúng output |
-| Telegram test thủ công | PASS theo ảnh người dùng — cả 3 node xanh, mỗi node 1 item, `Workflow executed successfully`; chưa xem nội dung preview trên Telegram |
-| Production webhook | NOT_RUN — cần Publish rồi gửi tin nhắn mới mà không bấm Execute |
-| Social APIs, menu, approval | Chưa triển khai — chỉ tiếp tục sau Phase 1 đạt |
+| Telegram V1 | PASS theo ảnh và xác nhận người dùng — bot trả preview và DRAFT sau Publish |
+| Menu V2 offline | PASS — `node scripts/check-menu-workflow.cjs`, lựa chọn, state riêng, TTL, duplicate/stale update, media, HTML/Unicode |
+| Menu V2 runtime | PASS — instance n8n tạm 5680 chạy Data Table + Code + If qua các HTTP executions riêng; session giữ đúng sau restart |
+| Menu V2 native keyboard | PASS — kiểm tra n8n normalization, expression engine và Telegram reply_markup, đúng 7/9 nút và callback |
+| Menu V2 deployed | PASS — workflow Telegram Menu đã cập nhật thành 12 node và Published, giữ credential references |
+| Menu V2 Telegram /new | PASS theo xác nhận người dùng — đã thấy các nút lựa chọn sau khi sửa lỗi fixedCollection expression |
+| Menu V2 Telegram callback và preview | Đang kiểm tra — người dùng đang chọn loại/dạng và gửi nội dung |
+| Approval và Social APIs | Chưa triển khai — phase sau |
 
-Workflow đã có sẵn: [mở trong n8n](http://localhost:5678/workflow/seKtuQgWny3K7y5m).
+Workflow V2 đã có sẵn: [mở trong n8n](http://localhost:5678/workflow/seKtuQgWny3K7y5m).
 Không import lại nếu đang dùng instance này. File JSON vẫn được cung cấp để kiểm
 tra hoặc cài instance mới. Smoke test dùng DB riêng ở `/tmp/social-runtime-check`
 trong container, không thêm workflow test vào workspace n8n chính và không gọi
@@ -46,6 +51,6 @@ Không cần cài cloudflared toàn hệ thống; dùng `tools/cloudflared.exe` 
 [hướng dẫn](docs/TELEGRAM_SETUP.md). Portable tải từ
 [release Cloudflare 2026.10.4](https://github.com/cloudflare/cloudflared/releases/tag/2026.10.4).
 
-Bước tiếp theo: xác nhận bot trả `PREVIEW BAI DANG`, đúng nội dung và `DRAFT`;
-bấm Publish và gửi tin nhắn mới mà không bấm Execute để kiểm tra production
-webhook. Chưa đánh dấu Phase 1 hoàn thành trước khi xác nhận các kết quả này.
+Bước tiếp theo: chọn loại thiệp và dạng nội dung bằng nút trên Telegram,
+gửi text rồi xác nhận preview đúng lựa chọn và `DRAFT`. V2 đã Published, không cần
+bấm Execute. Xem [hướng dẫn menu](docs/TELEGRAM_MENU.md).

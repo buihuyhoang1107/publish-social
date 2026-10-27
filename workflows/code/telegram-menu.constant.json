@@ -1,0 +1,22 @@
+{
+  "services": {
+    "WEDDING": "Thiệp cưới",
+    "BIRTHDAY": "Sinh nhật",
+    "BABY": "Thôi nôi / đầy tháng",
+    "HOUSE_WARMING": "Tân gia",
+    "YEAR_END": "Tất niên",
+    "LONGEVITY": "Mừng thọ",
+    "EVENT": "Sự kiện khác"
+  },
+  "contentTypes": {
+    "DEMO": "Demo",
+    "FEATURE": "Tính năng",
+    "EDUCATION": "Mẹo / kiến thức",
+    "PROBLEM": "Vấn đề",
+    "VIRAL": "Viral",
+    "SALE": "Bán hàng",
+    "INSPIRATION": "Cảm hứng",
+    "TUTORIAL": "Hướng dẫn",
+    "COMPARISON": "So sánh"
+  }
+}

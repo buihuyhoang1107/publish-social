@@ -1,0 +1,669 @@
+{
+  "name": "Social Publisher - Telegram Menu",
+  "nodes": [
+    {
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ],
+        "additionalFields": {
+          "download": false
+        }
+      },
+      "webhookId": "b9b17288-112f-48bf-912e-37113d0af7ac",
+      "notes": "V2 dùng Telegram file_id, không tải binary chỉ để hiển thị menu. Chỉ hỗ trợ chat riêng."
+    },
+    {
+      "id": "ensure-sessions-table",
+      "name": "Ensure Sessions Table",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "resource": "table",
+        "operation": "create",
+        "tableName": "social_publisher_sessions",
+        "columns": {
+          "column": [
+            {
+              "name": "sessionKey",
+              "type": "string"
+            },
+            {
+              "name": "sessionJson",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {
+          "createIfNotExists": true
+        }
+      }
+    },
+    {
+      "id": "load-session",
+      "name": "Load Session",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "get",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Ensure Sessions Table').first().json.id }}"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionKey",
+              "condition": "eq",
+              "keyValue": "={{ (() => { const u = $('Telegram Trigger').first().json; const c = u.callback_query; const m = c ? c.message : u.message; return m?.chat && (c?.from ?? m.from) ? m.chat.id + ':' + (c ? c.from.id : m.from.id) : 'unsupported'; })() }}"
+            }
+          ]
+        },
+        "returnAll": false,
+        "limit": 1
+      },
+      "alwaysOutputData": true
+    },
+    {
+      "id": "telegram-menu-router",
+      "name": "Telegram Menu Router",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const menuOptions = {\"services\":{\"WEDDING\":\"Thiệp cưới\",\"BIRTHDAY\":\"Sinh nhật\",\"BABY\":\"Thôi nôi / đầy tháng\",\"HOUSE_WARMING\":\"Tân gia\",\"YEAR_END\":\"Tất niên\",\"LONGEVITY\":\"Mừng thọ\",\"EVENT\":\"Sự kiện khác\"},\"contentTypes\":{\"DEMO\":\"Demo\",\"FEATURE\":\"Tính năng\",\"EDUCATION\":\"Mẹo / kiến thức\",\"PROBLEM\":\"Vấn đề\",\"VIRAL\":\"Viral\",\"SALE\":\"Bán hàng\",\"INSPIRATION\":\"Cảm hứng\",\"TUTORIAL\":\"Hướng dẫn\",\"COMPARISON\":\"So sánh\"}};\n// Embedded into the n8n Code node by scripts/build-menu-workflow.cjs.\nconst update = $('Telegram Trigger').first().json;\nconst callback = update.callback_query;\nconst message = callback ? callback.message : update.message;\nconst actor = callback ? callback.from : message?.from;\nif (!message?.chat || !actor || message.chat.type !== 'private') return [];\n\nconst { services, contentTypes } = menuOptions;\nconst escapeHtml = (text) => text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');\nconst sessionKey = `${message.chat.id}:${actor.id}`;\nconst stored = $input.first().json.sessionJson;\nlet session = stored ? JSON.parse(stored) : { stage: 'IDLE' };\nconst now = Date.now();\n// TTL also lets a user recover after Telegram resets its update sequence following inactivity.\nif (session.expiresAt && session.expiresAt < now) session = { stage: 'IDLE' };\nif (session.lastUpdateId !== undefined && update.update_id <= session.lastUpdateId) return [];\nconst command = (message.text ?? '').split(/\\s/, 1)[0].split('@', 1)[0];\nlet text = '';\nlet keyboard = { rows: [] };\nlet menuKind = 'none';\nconst menu = (options, kind) => ({ rows: Object.entries(options).map(([value, label]) => ({\n  row: { buttons: [{ text: label, additionalFields: { callback_data: `sp:${session.id}:${kind}:${value}` } }] },\n})) });\nconst showServices = () => {\n  text = 'Bạn muốn tạo nội dung cho loại thiệp nào?';\n  keyboard = menu(services, 'service');\n  menuKind = 'service';\n};\nconst showTypes = () => {\n  text = `Loại thiệp: ${services[session.service]}\\nBạn muốn tạo dạng nội dung nào?`;\n  keyboard = menu(contentTypes, 'type');\n  menuKind = 'type';\n};\nconst requestContent = () => {\n  text = `Loại thiệp: ${services[session.service]}\\nDạng: ${contentTypes[session.contentType]}\\n\\nGửi nội dung bằng text hoặc gửi một ảnh/video có caption.\\nDùng /cancel để hủy, /new để bắt đầu lại.`;\n};\n\nif (!callback && (command === '/new' || command === '/start')) {\n  session = { id: update.update_id.toString(36), stage: 'SERVICE' };\n  showServices();\n} else if (!callback && command === '/cancel') {\n  session = { stage: 'IDLE' };\n  text = 'Đã hủy bản nháp đang tạo. Gửi /new để tạo bài mới.';\n} else if (callback) {\n  const [prefix, sessionId, kind, value] = (callback.data ?? '').split(':');\n  if (prefix !== 'sp' || sessionId !== session.id) {\n    text = 'Nút này thuộc phiên cũ. Gửi /new để mở menu mới.';\n  } else if (kind === 'service' && session.stage === 'SERVICE' && Object.hasOwn(services, value)) {\n    session.service = value;\n    session.stage = 'CONTENT_TYPE';\n    showTypes();\n  } else if (kind === 'type' && session.stage === 'CONTENT_TYPE' && Object.hasOwn(contentTypes, value)) {\n    session.contentType = value;\n    session.stage = 'CONTENT';\n    requestContent();\n  } else {\n    text = 'Lựa chọn này không còn hiệu lực. Hãy dùng menu mới nhất hoặc gửi /new.';\n  }\n} else if (command.startsWith('/')) {\n  text = 'Gửi /new để tạo bài mới hoặc /cancel để hủy phiên hiện tại.';\n} else if (session.stage === 'SERVICE') {\n  showServices();\n} else if (session.stage === 'CONTENT_TYPE') {\n  showTypes();\n} else if (session.stage === 'CONTENT') {\n  const content = message.text ?? message.caption ?? '';\n  const photo = message.photo?.[message.photo.length - 1];\n  const video = message.video;\n  if (message.media_group_id) {\n    text = 'Phiên bản này nhận từng ảnh/video riêng lẻ. Hãy gửi một file có caption, không gửi album.';\n  } else if (!content.trim() || (!message.text && !photo && !video)) {\n    text = 'Hãy gửi nội dung bằng text hoặc một ảnh/video kèm caption để tạo preview.';\n  } else {\n    const post = {\n      postId: `TG-${message.chat.id}-${message.message_id}`,\n      service: session.service,\n      topic: '',\n      contentType: session.contentType,\n      goal: 'LEAD',\n      hook: '',\n      content,\n      cta: '',\n      mediaType: video ? 'VIDEO' : photo ? 'IMAGE' : 'TEXT',\n      mediaPath: '',\n      platforms: ['FACEBOOK', 'INSTAGRAM', 'THREADS', 'TIKTOK'],\n      status: 'DRAFT',\n    };\n    if (video || photo) post.telegramFileId = (video ?? photo).file_id;\n    session.post = post;\n    session.stage = 'PREVIEW';\n    const shown = content.length > 2400 ? Array.from(content).slice(0, 2400).join('') + '\\n[Preview rút gọn; bản nháp giữ nguyên nội dung.]' : content;\n    text = `PREVIEW BAI DANG\\n\\nLoại: ${services[post.service]} (${post.service})\\nDạng: ${contentTypes[post.contentType]} (${post.contentType})\\n\\nNội dung:\\n${shown}\\n\\nĐính kèm: ${post.mediaType}\\n\\nNền tảng dự kiến (chưa đăng):\\nFacebook YES\\nInstagram YES\\nThreads YES\\nTikTok YES\\n\\nTrạng thái: DRAFT\\n\\nMenu V2 chưa có duyệt/đăng bài. Gửi /new để tạo bài mới hoặc /cancel để hủy.`;\n  }\n} else {\n  text = 'Gửi /new để tạo bài mới: chọn loại thiệp → dạng nội dung → gửi bài → xem preview.';\n}\n\nsession.lastUpdateId = update.update_id;\nsession.expiresAt = now + 24 * 60 * 60 * 1000;\nreturn [{ json: {\n  sessionKey,\n  sessionJson: JSON.stringify(session),\n  chatId: message.chat.id,\n  hasCallback: Boolean(callback),\n  textHtml: escapeHtml(text),\n  keyboard,\n  menuKind,\n  menuSessionId: session.id ?? '',\n  masterPost: session.post ?? {},\n} }];\n"
+      }
+    },
+    {
+      "id": "save-session",
+      "name": "Save Session",
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "resource": "row",
+        "operation": "upsert",
+        "dataTableId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $('Ensure Sessions Table').first().json.id }}"
+        },
+        "matchType": "allConditions",
+        "filters": {
+          "conditions": [
+            {
+              "keyName": "sessionKey",
+              "condition": "eq",
+              "keyValue": "={{ $json.sessionKey }}"
+            }
+          ]
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "sessionKey": "={{ $json.sessionKey }}",
+            "sessionJson": "={{ $json.sessionJson }}"
+          },
+          "schema": [
+            {
+              "id": "sessionKey",
+              "displayName": "sessionKey",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "sessionJson",
+              "displayName": "sessionJson",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "is-callback",
+      "name": "Is Callback",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "callback",
+              "leftValue": "={{ $('Telegram Menu Router').first().json.hasCallback }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "answer-callback",
+      "name": "Answer Callback",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        -140
+      ],
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $('Telegram Trigger').first().json.callback_query.id }}",
+        "additionalFields": {}
+      },
+      "onError": "continueRegularOutput",
+      "notes": "Callback hết hạn không được chặn việc phản hồi menu. Không tự retry."
+    },
+    {
+      "id": "telegram-menu-reply",
+      "name": "Telegram Menu Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        220
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Menu Router').first().json.chatId }}",
+        "text": "={{ $('Telegram Menu Router').first().json.textHtml }}",
+        "replyMarkup": "none",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      }
+    },
+    {
+      "id": "is-service-menu",
+      "name": "Is Service Menu",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "service",
+              "leftValue": "={{ $('Telegram Menu Router').first().json.menuKind }}",
+              "rightValue": "service",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "service-options",
+      "name": "Service Options",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        -180
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Menu Router').first().json.chatId }}",
+        "text": "={{ $('Telegram Menu Router').first().json.textHtml }}",
+        "replyMarkup": "inlineKeyboard",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        },
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Thiệp cưới",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':service:WEDDING' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Sinh nhật",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':service:BIRTHDAY' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Thôi nôi / đầy tháng",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':service:BABY' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Tân gia",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':service:HOUSE_WARMING' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Tất niên",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':service:YEAR_END' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Mừng thọ",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':service:LONGEVITY' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Sự kiện khác",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':service:EVENT' }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "is-content-type-menu",
+      "name": "Is Content Type Menu",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1920,
+        120
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "type",
+              "leftValue": "={{ $('Telegram Menu Router').first().json.menuKind }}",
+              "rightValue": "type",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "content-type-options",
+      "name": "Content Type Options",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2160,
+        20
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $('Telegram Menu Router').first().json.chatId }}",
+        "text": "={{ $('Telegram Menu Router').first().json.textHtml }}",
+        "replyMarkup": "inlineKeyboard",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        },
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Demo",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:DEMO' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Tính năng",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:FEATURE' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Mẹo / kiến thức",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:EDUCATION' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Vấn đề",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:PROBLEM' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Viral",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:VIRAL' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Bán hàng",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:SALE' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Cảm hứng",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:INSPIRATION' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Hướng dẫn",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:TUTORIAL' }}"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "So sánh",
+                    "additionalFields": {
+                      "callback_data": "={{ 'sp:' + $('Telegram Menu Router').first().json.menuSessionId + ':type:COMPARISON' }}"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Ensure Sessions Table",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ensure Sessions Table": {
+      "main": [
+        [
+          {
+            "node": "Load Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Load Session": {
+      "main": [
+        [
+          {
+            "node": "Telegram Menu Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Menu Router": {
+      "main": [
+        [
+          {
+            "node": "Save Session",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save Session": {
+      "main": [
+        [
+          {
+            "node": "Is Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Callback": {
+      "main": [
+        [
+          {
+            "node": "Answer Callback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Service Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Answer Callback": {
+      "main": [
+        [
+          {
+            "node": "Is Service Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Service Menu": {
+      "main": [
+        [
+          {
+            "node": "Service Options",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Content Type Menu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Content Type Menu": {
+      "main": [
+        [
+          {
+            "node": "Content Type Options",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Menu Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

@@ -1,16 +1,21 @@
 # Tiếp tục công việc
 
 - Trạng thái: in_progress
-- Cập nhật: 2026-10-27T11:16:28+07:00
-- Mục tiêu: Social Publisher Phase 1: Telegram -> n8n -> Master Post -> Preview
-- File: compose.yaml
-- File: workflows/telegram-intake.json
-- File: docs/TELEGRAM_SETUP.md
-- File: SETUP_STATUS.md
-- Đã làm / quyết định: n8n 2.44.7 local; cloudflared portable 2026.10.4; tunnel HTTPS da health 200. URL .env, PID/log temp. Token chi trong n8n Credentials.
-- Đã làm / quyết định: Workflow ID seKtuQgWny3K7y5m da import; user chon Telegram account ca hai node. Anh moi xac nhan ca 3 node xanh, moi node 1 item, Workflow executed successfully.
-- Đã làm / quyết định: Chua lam menu/approval/social truoc Phase 1 dat; khong dung git.
-- Kiểm tra: PASS offline checks, Compose validation, local/tunnel health, n8n runtime smoke DB rieng
-- Kiểm tra: PASS theo anh user: Telegram manual execution 3 node thanh cong; chua xem noi dung bot tra
-- Kiểm tra: NOT_RUN production webhook: cho Publish va gui tin nhan moi khong bam Execute
-- Bước tiếp theo: Xac nhan preview Telegram dung noi dung va DRAFT; Publish tren UI roi gui tin nhan moi khong Execute. Chi chot Phase 1 sau production test.
+- Cập nhật: 2026-10-27T11:40:14+07:00
+- Mục tiêu: Social Publisher Phase 2 menu: fix Telegram options va verify callback/preview
+- File: workflows/telegram-menu.json
+- File: workflows/code/telegram-menu.js
+- File: workflows/code/telegram-menu.constant.json
+- File: scripts/build-menu-workflow.cjs
+- File: scripts/check-menu-native.cjs
+- File: scripts/check-menu-workflow.cjs
+- File: scripts/check-menu-runtime.cjs
+- File: docs/TELEGRAM_MENU.md
+- Đã làm / quyết định: V1 production dat. V2 publish tren cung ID seKtuQgWny3K7y5m, ten Social Publisher - Telegram Menu, giu credentials. Khong import lai V1.
+- Đã làm / quyết định: Da sua loi native n8n normalize inlineKeyboard expression thanh {}: dung static fixedCollection voi callback_data expression tung nut, tach Service Options / Content Type Options / plain Reply; 12 node. User da xac nhan DA CO NUT CHON sau deploy ban sua.
+- Đã làm / quyết định: Taxonomy7/9 dung config chung. Session DataTable social_publisher_sessions trong SQLite; production concurrency1, private chat, TTL24h, stale/dedupe. Text/single photo/video co caption. Chua approval/social. Test container da don. Khong git.
+- Kiểm tra: PASS offline test va runtime HTTP n8n rieng cac nhanh, session/state, media
+- Kiểm tra: PASS native n8n Workflow normalization + expression engine + Telegram reply_markup: 7/9 buttons correct callbacks
+- Kiểm tra: PASS deploy latest active12nodes,credentials,health200; user xac nhan nut that hien Telegram
+- Kiểm tra: PENDING user chon options va gui text de xac nhan preview service/contentType/DRAFT
+- Bước tiếp theo: User bam Thiệp cưới -> dang noi dung -> gui text; xac nhan preview dung lua chon. Neu loi doc execution metadata / n8n UI. Chi lam approval sau menu dat.

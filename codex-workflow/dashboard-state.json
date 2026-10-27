@@ -1,123 +1,21 @@
 {
   "version": 1,
   "task": {
-    "id": "telegram-v1-20261027",
-    "title": "Telegram n8n Phase 1",
-    "goal": "Text Telegram qua Master Post va tra Preview",
+    "id": "telegram-approval-20261027",
+    "title": "Telegram Phase 3 - Duyet Sua Huy",
+    "goal": "Preview co nut Duyet Sua Huy, luu bai da duyet, chua dang social",
     "status": "working",
     "criteria": [
-      "n8n local hoat dong; workflow import duoc; Telegram tra PREVIEW BAI DANG"
+      "Approval dung ban nhap, edit phai duyet lai, cancel/stale callbacks khong approve"
     ]
   },
-  "roles": {
-    "lead": {
-      "status": "working",
-      "action": "Ha tang, workflow import va runtime PASS; cho nguoi dung hoan tat credential de test Telegram that",
-      "phase": "verification",
-      "updated_at": "2026-10-27T11:06:13+07:00",
-      "next": "User gan credential 2 node, gui test text, sau do publish va test production",
-      "files": [
-        "SETUP_STATUS.md",
-        "README.md",
-        "docs/TELEGRAM_SETUP.md"
-      ],
-      "checks": [
-        {
-          "status": "PASS",
-          "label": "n8n 2.44.7 local va tunnel health HTTP 200"
-        },
-        {
-          "status": "PASS",
-          "label": "Workflow import va runtime Set/Preview status success"
-        },
-        {
-          "status": "NOT_RUN",
-          "label": "Telegram test va production webhook cho credential"
-        }
-      ],
-      "artifacts": [
-        "http://localhost:5678/workflow/seKtuQgWny3K7y5m"
-      ]
-    },
-    "implement": {
-      "status": "working",
-      "action": "Da tao workflow, sample va huong dan; offline checks PASS; Docker dang tai image",
-      "phase": "verification",
-      "updated_at": "2026-10-27T11:02:53+07:00",
-      "next": "Kiem tra n8n runtime va portable cloudflared",
-      "files": [
-        "compose.yaml",
-        "workflows/telegram-intake.json"
-      ],
-      "checks": [
-        {
-          "status": "PASS",
-          "label": "node scripts/check-workflow.cjs"
-        },
-        {
-          "status": "PASS",
-          "label": "docker compose config --quiet"
-        },
-        {
-          "status": "NOT_RUN",
-          "label": "Telegram that cho nhap credential tren n8n"
-        }
-      ]
-    },
-    "review": {
-      "status": "working",
-      "action": "Anh user xac nhan Telegram manual execution thanh cong ca 3 node, moi node 1 item",
-      "phase": "verification",
-      "updated_at": "2026-10-27T11:16:28+07:00",
-      "next": "Publish va gui tin nhan moi khong bam Execute",
-      "checks": [
-        {
-          "status": "PASS",
-          "label": "Manual execution theo anh user: 3 node xanh va Workflow executed successfully"
-        },
-        {
-          "status": "NOT_RUN",
-          "label": "Xac nhan noi dung Telegram preview va production webhook sau Publish"
-        }
-      ]
-    }
-  },
+  "roles": {},
   "events": [
     {
-      "at": "2026-10-27T11:16:28+07:00",
-      "role": "review",
-      "message": "Anh user xac nhan Telegram manual execution thanh cong ca 3 node, moi node 1 item"
-    },
-    {
-      "at": "2026-10-27T11:06:13+07:00",
+      "at": "2026-10-27T11:42:02+07:00",
       "role": "lead",
-      "message": "Ha tang, workflow import va runtime PASS; cho nguoi dung hoan tat credential de test Telegram that"
-    },
-    {
-      "at": "2026-10-27T11:05:00+07:00",
-      "role": "review",
-      "message": "n8n 2.44.7 chay HTTP 200; import workflow that thanh cong; Set va Preview expression chay runtime PASS"
-    },
-    {
-      "at": "2026-10-27T11:02:53+07:00",
-      "role": "implement",
-      "message": "Da tao workflow, sample va huong dan; offline checks PASS; Docker dang tai image"
-    },
-    {
-      "at": "2026-10-27T11:00:05+07:00",
-      "role": "implement",
-      "message": "Tao Compose, workflow 3 node va huong dan Telegram"
-    },
-    {
-      "at": "2026-10-27T10:59:35+07:00",
-      "role": "lead",
-      "message": "Da doc flow; chon Phase 1 Docker Compose, chua lam social API"
-    },
-    {
-      "at": "2026-10-27T10:59:35+07:00",
-      "role": "lead",
-      "message": "Nhiệm vụ: Telegram n8n Phase 1 (working)"
+      "message": "Nhiệm vụ: Telegram Phase 3 - Duyet Sua Huy (working)"
     }
   ],
-  "updated_at": "2026-10-27T11:16:28+07:00"
+  "updated_at": "2026-10-27T11:42:02+07:00"
 }
