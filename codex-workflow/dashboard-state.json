@@ -1,50 +1,77 @@
 {
   "version": 1,
   "task": {
-    "id": "telegram-approval-20261027",
-    "title": "Telegram Phase 3 - Duyet Sua Huy",
-    "goal": "Preview co nut Duyet Sua Huy, luu bai da duyet, chua dang social",
+    "id": "buffer-tiktok-20261027",
+    "title": "Buffer + n8n dang TikTok, bo duyet Telegram",
+    "goal": "User dua content/media, n8n dang TikTok qua Buffer va tra ket qua",
     "status": "working",
     "criteria": [
-      "Approval dung ban nhap, edit phai duyet lai, cancel/stale callbacks khong approve"
+      "Ket noi Buffer TikTok, credential n8n, publish bai test duoc xac nhan"
     ]
   },
   "roles": {
-    "implement": {
+    "lead": {
       "status": "working",
-      "action": "Da them Duyet Sua Huy, /preview, luu approval rieng trong DataTable, edit giu media va yeu cau duyet lai",
-      "phase": "verification",
-      "updated_at": "2026-10-27T11:43:31+07:00",
-      "next": "Runtime DataTable archive va deploy",
+      "action": "User da chon Buffer+n8n, bo duyetTelegram; huong dan ket noi TikTok trong Buffer",
+      "phase": "analysis",
+      "updated_at": "2026-10-27T14:07:54+07:00",
+      "next": "User tao Buffer va Channels -> Connect TikTok; sau do luu APIkey trong n8n Credentials",
       "files": [
-        "workflows/code/telegram-menu.js",
-        "scripts/build-menu-workflow.cjs",
-        "scripts/check-menu-workflow.cjs",
-        "scripts/check-menu-native.cjs"
+        "docs/BUFFER_SETUP.md"
       ],
       "checks": [
         {
           "status": "PASS",
-          "label": "Offline approval/edit/cancel/stale/dedupe"
+          "label": "Da doi chieu official Buffer API QuickStart va TikTok auto publishing"
         },
         {
-          "status": "PASS",
-          "label": "Native Telegram markup co7/9/3nut"
+          "status": "NOT_RUN",
+          "label": "Chua tai khoan/ket noiBuffer/APIkey/channel/media de test"
         }
+      ]
+    },
+    "implement": {
+      "status": "working",
+      "action": "Buffer API that PASS, TikTokchannelverified; dang tao formuploadfile va temporarymedia choBufferfetch",
+      "phase": "implementation",
+      "updated_at": "2026-10-27T14:30:47+07:00",
+      "next": "Test nativeform/media va mockpublish truoc deploy",
+      "files": [
+        "workflows/buffer-publisher.json",
+        "scripts/build-buffer-workflow.cjs"
+      ],
+      "checks": [
+        {
+          "status": "PASS",
+          "label": "APIreadorg/channels: thieponline.org connected unlocked scheduleUpdates"
+        }
+      ],
+      "artifacts": [
+        "http://localhost:5678/workflow/socialBufferPublisher"
       ]
     }
   },
   "events": [
     {
-      "at": "2026-10-27T11:43:31+07:00",
+      "at": "2026-10-27T14:30:47+07:00",
       "role": "implement",
-      "message": "Da them Duyet Sua Huy, /preview, luu approval rieng trong DataTable, edit giu media va yeu cau duyet lai"
+      "message": "Buffer API that PASS, TikTokchannelverified; dang tao formuploadfile va temporarymedia choBufferfetch"
     },
     {
-      "at": "2026-10-27T11:42:02+07:00",
+      "at": "2026-10-27T14:12:52+07:00",
+      "role": "implement",
+      "message": "Da tao BufferAPI credential rong va workflow readonly Start -> Read Buffer Account"
+    },
+    {
+      "at": "2026-10-27T14:07:54+07:00",
       "role": "lead",
-      "message": "Nhiệm vụ: Telegram Phase 3 - Duyet Sua Huy (working)"
+      "message": "User da chon Buffer+n8n, bo duyetTelegram; huong dan ket noi TikTok trong Buffer"
+    },
+    {
+      "at": "2026-10-27T14:07:53+07:00",
+      "role": "lead",
+      "message": "Nhiệm vụ: Buffer + n8n dang TikTok, bo duyet Telegram (working)"
     }
   ],
-  "updated_at": "2026-10-27T11:43:31+07:00"
+  "updated_at": "2026-10-27T14:30:47+07:00"
 }

@@ -1,5 +1,12 @@
 # Social Publisher — Telegram + n8n
 
+**Luồng đang dùng:** gửi ảnh, album tối đa 10 ảnh hoặc một video kèm caption trong
+bot Telegram → gửi đăng TikTok, Facebook Page, Instagram, Threads đã kết nối → báo
+kết quả từng kênh tại Telegram. Không có bước duyệt. Buffer chạy phía sau.
+Hiện API xác nhận TikTok `thieponline.org` đã kết nối; ba nền tảng còn lại cần cấp quyền trong Buffer một lần.
+Gửi `/start` để xem hướng dẫn, `/status` để kiểm tra bài gần nhất.
+Xem [hướng dẫn hiện tại](docs/TELEGRAM_PUBLISHER.md). Phần menu/duyệt bên dưới là lịch sử triển khai.
+
 Triển khai theo [flow gốc](SOCIAL_PUBLISHER_TELEGRAM_N8N.md), từng phase.
 Phase hiện tại: **/new → loại thiệp → dạng nội dung → bài → preview → Duyệt/Sửa/Hủy**.
 Menu và preview đã được người dùng xác nhận trên Telegram. Các nút duyệt đã

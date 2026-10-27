@@ -1,0 +1,513 @@
+{
+  "name": "Social Publisher - Buffer",
+  "nodes": [
+    {
+      "id": "buffer-manual-start",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "read-buffer-account",
+      "name": "Read Buffer Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\":\"query GetOrganizations { account { organizations { id } } }\"}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "notes": "Bước kiểm tra kết nối: chọn credential Buffer API. Chỉ đọc account/organizations, chưa đăng bài. Source query từ Buffer Quick Start."
+    },
+    {
+      "id": "read-buffer-channels",
+      "name": "Read Buffer Channels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        560,
+        0
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { query: \"query GetChannels($input: ChannelsInput!) { channels(input: $input) { id name service isDisconnected isLocked allowedActions } }\", variables: { input: { organizationId: $json.data.account.organizations[0].id } } } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "notes": "??c danh s?ch k?nh sau khi account ?? ph?n h?i th?nh c?ng. Kh?ng ??ng b?i."
+    },
+    {
+      "id": "upload-video",
+      "name": "Upload Video",
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        0,
+        300
+      ],
+      "parameters": {
+        "authentication": "n8nUserAuth",
+        "requireExecuteAccess": true,
+        "formTitle": "Đăng video TikTok",
+        "formDescription": "Tài khoản: thieponline.org. Chọn video tối đa 100 MB và nhập caption. Bấm Đăng TikTok để gửi đăng ngay.",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "Video",
+              "fieldName": "video",
+              "fieldType": "file",
+              "multipleFiles": false,
+              "acceptFileTypes": ".mp4,.mov,.webm",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Caption",
+              "fieldName": "caption",
+              "fieldType": "textarea",
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "Video được tạo bằng AI?",
+              "fieldName": "aiGenerated",
+              "fieldType": "dropdown",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "Không"
+                  },
+                  {
+                    "option": "Có"
+                  }
+                ]
+              },
+              "defaultValue": "Không",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "path": "publish-tiktok",
+          "buttonLabel": "Đăng TikTok",
+          "appendAttribution": false,
+          "includeUserInOutput": false
+        }
+      },
+      "webhookId": "2a155725-bb27-4411-bcb5-9846dbb9f770"
+    },
+    {
+      "id": "prepare-video",
+      "name": "Prepare Video",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const bufferConfig = {\"channelId\":\"6ae04e2c2f1f5ed648e6e5cc\",\"publicBaseUrl\":\"https://parent-duck-lines-muscle.trycloudflare.com\"};\nconst crypto = require('crypto');\nconst item = $input.first();\nconst video = item.binary?.video;\nif (!video?.fileName) throw new Error('Hãy chọn một file video để đăng.');\nconst extension = video.fileName.split('.').pop().toLowerCase();\nif (!['mp4', 'mov', 'webm'].includes(extension)) throw new Error('Chọn video MP4, MOV hoặc WEBM.');\nconst token = crypto.randomBytes(16).toString('hex');\nconst expiresAt = Date.now() + 24 * 60 * 60 * 1000;\nconst mediaName = `${token}_${expiresAt}.${extension}`;\nreturn [{ json: {\n  caption: item.json.caption ?? '',\n  isAiGenerated: item.json.aiGenerated === 'Có',\n  channelId: bufferConfig.channelId,\n  mediaName,\n  localFile: `/files/${mediaName}`,\n  mediaUrl: `${bufferConfig.publicBaseUrl}/webhook/buffer-media/${mediaName}`,\n}, binary: { video } }];\n"
+      }
+    },
+    {
+      "id": "store-video",
+      "name": "Store Video",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        300
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.localFile }}",
+        "dataPropertyName": "video",
+        "options": {}
+      }
+    },
+    {
+      "id": "publish-tiktok",
+      "name": "Publish TikTok",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        720,
+        300
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { query: \"mutation PublishTikTok($input: CreatePostInput!) { createPost(input: $input) { __typename ... on PostActionSuccess { post { id status externalLink error { message } } } ... on InvalidInputError { message } ... on UnauthorizedError { message } ... on NotFoundError { message } ... on UnexpectedError { message } ... on LimitReachedError { message } } }\", variables: { input: { channelId: $('Prepare Video').first().json.channelId, text: $('Prepare Video').first().json.caption, assets: [{ video: { url: $('Prepare Video').first().json.mediaUrl } }], mode: 'shareNow', schedulingType: 'automatic', needsApproval: false, saveToDraft: false, metadata: { tiktok: { isAiGenerated: $('Prepare Video').first().json.isAiGenerated } } } } } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "retryOnFail": false,
+      "notes": "Đăng công khai khi user gửi form. Không tự retry mutation khi có lỗi mạng."
+    },
+    {
+      "id": "publish-result",
+      "name": "Publish Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nif (response.errors?.length) throw new Error(response.errors.map((error) => error.message).join('\\n'));\nconst created = response.data?.createPost;\nif (created && created.__typename !== 'PostActionSuccess') {\n  throw new Error(created.message ?? `Buffer không nhận bài: ${created.__typename}`);\n}\nconst post = created ? created.post : response.data?.post;\nif (!post?.id) throw new Error('Buffer chưa trả mã bài đăng. Kiểm tra execution trước khi gửi lại để tránh đăng trùng.');\nconst terminal = ['sent', 'error', 'draft', 'needs_approval'].includes(post.status);\nconst message = post.status === 'sent'\n  ? 'Đã đăng TikTok thành công.'\n  : post.error?.message\n    ? `Đăng không thành công: ${post.error.message}`\n    : post.status === 'draft' || post.status === 'needs_approval'\n      ? 'Buffer đang giữ bài ở trạng thái cần xử lý, chưa đăng.'\n      : 'Đã gửi yêu cầu đăng. Buffer đang xử lý; xem kết quả trong Buffer → Sent hoặc Executions của n8n. Không gửi lại cùng bài khi chưa kiểm tra kết quả.';\nreturn [{ json: {\n  postId: post.id,\n  status: post.status,\n  shouldPoll: !terminal && $runIndex < 12,\n  formMessage: `${message}\\nMã bài: ${post.id}\\nTrạng thái: ${post.status}${post.externalLink ? '\\n' + post.externalLink : ''}`,\n} }];\n"
+      }
+    },
+    {
+      "id": "still-processing",
+      "name": "Still Processing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        300
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "pending",
+              "leftValue": "={{ $json.shouldPoll }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "wait-for-buffer",
+      "name": "Wait For Buffer",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1200,
+        100
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "webhookId": "b5e9090e-d70a-4cb1-be41-14898f420d1c"
+    },
+    {
+      "id": "read-post-status",
+      "name": "Read Post Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        100
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { query: \"query PostStatus($input: PostInput!) { post(input: $input) { id status externalLink error { message } } }\", variables: { input: { id: $json.postId } } } }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "show-result",
+      "name": "Show Result",
+      "type": "n8n-nodes-base.form",
+      "typeVersion": 2.5,
+      "position": [
+        1440,
+        400
+      ],
+      "parameters": {
+        "operation": "completion",
+        "respondWith": "text",
+        "completionTitle": "Kết quả đăng TikTok",
+        "completionMessage": "={{ $json.formMessage }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "video-download",
+      "name": "Video Download",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        700
+      ],
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "buffer-media/:fileName",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "webhookId": "72b6fa94-2772-4442-bd42-5b4d07e37206"
+    },
+    {
+      "id": "check-media-link",
+      "name": "Check Media Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        700
+      ],
+      "parameters": {
+        "jsCode": "const name = $input.first().json.params?.fileName;\nconst match = typeof name === 'string' && /^([a-f0-9]{32})_(\\d{13})\\.(mp4|mov|webm)$/.exec(name);\nif (!match || Number(match[2]) <= Date.now()) throw new Error('Video không tồn tại hoặc link đã hết hạn.');\nconst mimeTypes = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm' };\nreturn [{ json: { localFile: `/files/${name}`, mimeType: mimeTypes[match[3]] } }];\n"
+      }
+    },
+    {
+      "id": "read-video",
+      "name": "Read Video",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        480,
+        700
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $json.localFile }}",
+        "options": {
+          "dataPropertyName": "data",
+          "mimeType": "={{ $json.mimeType }}"
+        }
+      }
+    },
+    {
+      "id": "send-video",
+      "name": "Send Video",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        720,
+        700
+      ],
+      "parameters": {
+        "respondWith": "binary",
+        "responseDataSource": "set",
+        "inputFieldName": "data",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "private, no-store"
+              },
+              {
+                "name": "Content-Disposition",
+                "value": "inline; filename=\"video\""
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Read Buffer Account",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Buffer Account": {
+      "main": [
+        [
+          {
+            "node": "Read Buffer Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload Video": {
+      "main": [
+        [
+          {
+            "node": "Prepare Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Video": {
+      "main": [
+        [
+          {
+            "node": "Store Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Video": {
+      "main": [
+        [
+          {
+            "node": "Publish TikTok",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish TikTok": {
+      "main": [
+        [
+          {
+            "node": "Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Result": {
+      "main": [
+        [
+          {
+            "node": "Still Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Download": {
+      "main": [
+        [
+          {
+            "node": "Check Media Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Media Link": {
+      "main": [
+        [
+          {
+            "node": "Read Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Video": {
+      "main": [
+        [
+          {
+            "node": "Send Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Buffer": {
+      "main": [
+        [
+          {
+            "node": "Read Post Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Post Status": {
+      "main": [
+        [
+          {
+            "node": "Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Processing": {
+      "main": [
+        [
+          {
+            "node": "Wait For Buffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Show Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "executionTimeout": 180
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

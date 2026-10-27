@@ -1,0 +1,82 @@
+const fs = require('fs');
+const crypto = require('crypto');
+const message = $input.first().json.message;
+if (!message || message.chat?.type !== 'private' || !publisherConfig.allowedUserIds.includes(message.from?.id) || !publisherConfig.allowedChatIds.includes(message.chat.id)) return [];
+const context = { chatId: message.chat.id, messageId: message.message_id, shouldPublish: false, queryStatus: false, isAlbum: false };
+const reply = (text) => [{ json: { ...context, text } }];
+const command = (message.text ?? '').split(/\s/, 1)[0].split('@', 1)[0];
+const help = 'Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tự gửi đăng lên TikTok, Facebook Page, Instagram và Threads đã kết nối. Không cần duyệt.\nVới nhiều ảnh: chọn các ảnh và gửi chung thành một album, nhập caption một lần. Mỗi file tối đa 20 MB.\nVideo AI: thêm /ai ở đầu caption.\nGửi /status để xem kết quả từng nền tảng của bài gần nhất.';
+if (command === '/status') {
+  let target = message.reply_to_message?.message_id ?? Number((message.text ?? '').split(/\s+/)[1]);
+  if (!Number.isSafeInteger(target) || target <= 0) {
+    target = 0;
+    const prefix = `telegram-post-${context.chatId}-`;
+    for (const file of fs.readdirSync('/files')) {
+      if (!file.startsWith(prefix) || !file.endsWith('.json')) continue;
+      const id = Number(file.slice(prefix.length, -5));
+      if (Number.isSafeInteger(id) && id > target) target = id;
+    }
+  }
+  if (!target) return reply('Chưa có yêu cầu đăng nào được ghi nhận.');
+  let journalFile = `/files/telegram-post-${context.chatId}-${target}.json`;
+  let saved;
+  try {
+    saved = JSON.parse(fs.readFileSync(journalFile, 'utf8'));
+    if (saved.canonicalFile) {
+      journalFile = saved.canonicalFile;
+      saved = JSON.parse(fs.readFileSync(journalFile, 'utf8'));
+    }
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+    return reply('Chưa có yêu cầu đăng cho tin nhắn này.');
+  }
+  if (!saved.targets?.length && !saved.postId) return reply(saved.text ?? 'Bài đang được chuẩn bị, chưa có kết quả đăng.');
+  return [{ json: { ...context, messageId: saved.messageId, journalFile, queryStatus: true } }];
+}
+if (command.startsWith('/')) return reply(help);
+const photo = message.photo?.[message.photo.length - 1];
+const file = photo ?? message.video ?? message.document;
+if (!file) return reply('Bài chưa có ảnh/video. Bạn có thể gửi một ảnh, album ảnh hoặc video có caption.');
+const mediaType = photo || file.mime_type?.startsWith('image/') ? 'image' : 'video';
+const extension = photo ? 'jpg' : (file.file_name?.split('.').pop() ?? (file.mime_type === 'video/mp4' ? 'mp4' : '')).toLowerCase();
+const caption = (message.caption ?? '').replace(/^\/ai(?:\s|$)/i, '').trim();
+const medium = { messageId: message.message_id, fileId: file.file_id, mediaType, extension, caption, isAiGenerated: /^\/ai(?:\s|$)/i.test(message.caption ?? '') };
+if (!(mediaType === 'image' ? ['jpg', 'jpeg', 'png', 'webp'] : ['mp4', 'mov', 'webm']).includes(extension)) medium.error = 'Định dạng file chưa hỗ trợ. Ảnh: JPG, PNG, WEBP; video: MP4, MOV, WEBM.';
+if (file.file_size > 20 * 1024 * 1024) medium.error = 'Có file vượt giới hạn tải 20 MB của Telegram Bot.';
+const receiptPath = (id) => `/files/telegram-post-${context.chatId}-${id}.json`;
+if (message.media_group_id) {
+  const albumKey = crypto.createHash('sha256').update(`${context.chatId}:${message.media_group_id}`).digest('hex');
+  const albumPrefix = `telegram-album-${albumKey}`;
+  const claimFile = `/files/${albumPrefix}.claim.json`;
+  let claim;
+  try { claim = JSON.parse(fs.readFileSync(claimFile, 'utf8')); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
+  const partFile = `/files/${albumPrefix}-${message.message_id}.part.json`;
+  // Redelivery must not extend the quiet period or create another coordinator.
+  if (fs.existsSync(partFile)) return [];
+  if (claim && fs.existsSync(`/files/${albumPrefix}.sealed`)) return reply('Ảnh này đến sau khi album đã được gửi xử lý nên chưa được thêm vào bài. Những ảnh đã gửi đăng không bị đăng lại.');
+  try { fs.writeFileSync(partFile, JSON.stringify({ ...medium, receivedAt: Date.now() }), { flag: 'wx', mode: 0o600 }); }
+  catch (error) { if (error.code === 'EEXIST') return []; throw error; }
+  let coordinator = false;
+  try {
+    claim = { chatId: context.chatId, messageId: context.messageId, journalFile: receiptPath(context.messageId), albumPrefix };
+    fs.writeFileSync(claimFile, JSON.stringify(claim), { flag: 'wx', mode: 0o600 });
+    coordinator = true;
+  } catch (error) {
+    if (error.code !== 'EEXIST') throw error;
+    claim = JSON.parse(fs.readFileSync(claimFile, 'utf8'));
+  }
+  if (!coordinator) {
+    try { fs.writeFileSync(receiptPath(context.messageId), JSON.stringify({ canonicalFile: claim.journalFile }), { flag: 'wx', mode: 0o600 }); }
+    catch (error) { if (error.code !== 'EEXIST') throw error; }
+    return [];
+  }
+  fs.writeFileSync(claim.journalFile, JSON.stringify({ ...claim, status: 'collecting', createdAt: new Date().toISOString(), text: 'Đang gom các ảnh trong album thành một bài.' }), { flag: 'wx', mode: 0o600 });
+  return [{ json: { ...context, ...claim, isAlbum: true } }];
+}
+if (medium.error) return reply(medium.error + ' Bài chưa được đăng.');
+if (!caption) return reply('Ảnh/video này chưa có caption nên chưa được đăng.');
+const journalFile = receiptPath(context.messageId);
+try { fs.writeFileSync(journalFile, JSON.stringify({ ...context, status: 'received', createdAt: new Date().toISOString(), text: 'Đã nhận bài, đang chuẩn bị đăng.' }), { flag: 'wx', mode: 0o600 }); }
+catch (error) { if (error.code === 'EEXIST') return []; throw error; }
+return [{ json: { ...context, journalFile, caption, isAiGenerated: medium.isAiGenerated, media: [medium], shouldPublish: true } }];

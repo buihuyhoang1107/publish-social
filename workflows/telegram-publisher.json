@@ -1,0 +1,1165 @@
+{
+  "name": "Social Publisher - Telegram Multi Platform",
+  "nodes": [
+    {
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {
+          "download": false,
+          "userIds": "6729441444",
+          "chatIds": "6729441444"
+        }
+      },
+      "webhookId": "b9b17288-112f-48bf-912e-37113d0af7ac"
+    },
+    {
+      "id": "telegram-intake",
+      "name": "Telegram Intake",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const publisherConfig = {\"allowedUserIds\":[6729441444],\"allowedChatIds\":[6729441444],\"channelId\":\"6ae04e2c2f1f5ed648e6e5cc\",\"publicBaseUrl\":\"https://parent-duck-lines-muscle.trycloudflare.com\",\"services\":[\"tiktok\",\"facebook\",\"instagram\",\"threads\"],\"albumQuietMs\":3000,\"mediaWebhookId\":\"72b6fa94-2772-4442-bd42-5b4d07e37206\"};\nconst fs = require('fs');\nconst crypto = require('crypto');\nconst message = $input.first().json.message;\nif (!message || message.chat?.type !== 'private' || !publisherConfig.allowedUserIds.includes(message.from?.id) || !publisherConfig.allowedChatIds.includes(message.chat.id)) return [];\nconst context = { chatId: message.chat.id, messageId: message.message_id, shouldPublish: false, queryStatus: false, isAlbum: false };\nconst reply = (text) => [{ json: { ...context, text } }];\nconst command = (message.text ?? '').split(/\\s/, 1)[0].split('@', 1)[0];\nconst help = 'Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tự gửi đăng lên TikTok, Facebook Page, Instagram và Threads đã kết nối. Không cần duyệt.\\nVới nhiều ảnh: chọn các ảnh và gửi chung thành một album, nhập caption một lần. Mỗi file tối đa 20 MB.\\nVideo AI: thêm /ai ở đầu caption.\\nGửi /status để xem kết quả từng nền tảng của bài gần nhất.';\nif (command === '/status') {\n  let target = message.reply_to_message?.message_id ?? Number((message.text ?? '').split(/\\s+/)[1]);\n  if (!Number.isSafeInteger(target) || target <= 0) {\n    target = 0;\n    const prefix = `telegram-post-${context.chatId}-`;\n    for (const file of fs.readdirSync('/files')) {\n      if (!file.startsWith(prefix) || !file.endsWith('.json')) continue;\n      const id = Number(file.slice(prefix.length, -5));\n      if (Number.isSafeInteger(id) && id > target) target = id;\n    }\n  }\n  if (!target) return reply('Chưa có yêu cầu đăng nào được ghi nhận.');\n  let journalFile = `/files/telegram-post-${context.chatId}-${target}.json`;\n  let saved;\n  try {\n    saved = JSON.parse(fs.readFileSync(journalFile, 'utf8'));\n    if (saved.canonicalFile) {\n      journalFile = saved.canonicalFile;\n      saved = JSON.parse(fs.readFileSync(journalFile, 'utf8'));\n    }\n  } catch (error) {\n    if (error.code !== 'ENOENT') throw error;\n    return reply('Chưa có yêu cầu đăng cho tin nhắn này.');\n  }\n  if (!saved.targets?.length && !saved.postId) return reply(saved.text ?? 'Bài đang được chuẩn bị, chưa có kết quả đăng.');\n  return [{ json: { ...context, messageId: saved.messageId, journalFile, queryStatus: true } }];\n}\nif (command.startsWith('/')) return reply(help);\nconst photo = message.photo?.[message.photo.length - 1];\nconst file = photo ?? message.video ?? message.document;\nif (!file) return reply('Bài chưa có ảnh/video. Bạn có thể gửi một ảnh, album ảnh hoặc video có caption.');\nconst mediaType = photo || file.mime_type?.startsWith('image/') ? 'image' : 'video';\nconst extension = photo ? 'jpg' : (file.file_name?.split('.').pop() ?? (file.mime_type === 'video/mp4' ? 'mp4' : '')).toLowerCase();\nconst caption = (message.caption ?? '').replace(/^\\/ai(?:\\s|$)/i, '').trim();\nconst medium = { messageId: message.message_id, fileId: file.file_id, mediaType, extension, caption, isAiGenerated: /^\\/ai(?:\\s|$)/i.test(message.caption ?? '') };\nif (!(mediaType === 'image' ? ['jpg', 'jpeg', 'png', 'webp'] : ['mp4', 'mov', 'webm']).includes(extension)) medium.error = 'Định dạng file chưa hỗ trợ. Ảnh: JPG, PNG, WEBP; video: MP4, MOV, WEBM.';\nif (file.file_size > 20 * 1024 * 1024) medium.error = 'Có file vượt giới hạn tải 20 MB của Telegram Bot.';\nconst receiptPath = (id) => `/files/telegram-post-${context.chatId}-${id}.json`;\nif (message.media_group_id) {\n  const albumKey = crypto.createHash('sha256').update(`${context.chatId}:${message.media_group_id}`).digest('hex');\n  const albumPrefix = `telegram-album-${albumKey}`;\n  const claimFile = `/files/${albumPrefix}.claim.json`;\n  let claim;\n  try { claim = JSON.parse(fs.readFileSync(claimFile, 'utf8')); }\n  catch (error) { if (error.code !== 'ENOENT') throw error; }\n  const partFile = `/files/${albumPrefix}-${message.message_id}.part.json`;\n  // Redelivery must not extend the quiet period or create another coordinator.\n  if (fs.existsSync(partFile)) return [];\n  if (claim && fs.existsSync(`/files/${albumPrefix}.sealed`)) return reply('Ảnh này đến sau khi album đã được gửi xử lý nên chưa được thêm vào bài. Những ảnh đã gửi đăng không bị đăng lại.');\n  try { fs.writeFileSync(partFile, JSON.stringify({ ...medium, receivedAt: Date.now() }), { flag: 'wx', mode: 0o600 }); }\n  catch (error) { if (error.code === 'EEXIST') return []; throw error; }\n  let coordinator = false;\n  try {\n    claim = { chatId: context.chatId, messageId: context.messageId, journalFile: receiptPath(context.messageId), albumPrefix };\n    fs.writeFileSync(claimFile, JSON.stringify(claim), { flag: 'wx', mode: 0o600 });\n    coordinator = true;\n  } catch (error) {\n    if (error.code !== 'EEXIST') throw error;\n    claim = JSON.parse(fs.readFileSync(claimFile, 'utf8'));\n  }\n  if (!coordinator) {\n    try { fs.writeFileSync(receiptPath(context.messageId), JSON.stringify({ canonicalFile: claim.journalFile }), { flag: 'wx', mode: 0o600 }); }\n    catch (error) { if (error.code !== 'EEXIST') throw error; }\n    return [];\n  }\n  fs.writeFileSync(claim.journalFile, JSON.stringify({ ...claim, status: 'collecting', createdAt: new Date().toISOString(), text: 'Đang gom các ảnh trong album thành một bài.' }), { flag: 'wx', mode: 0o600 });\n  return [{ json: { ...context, ...claim, isAlbum: true } }];\n}\nif (medium.error) return reply(medium.error + ' Bài chưa được đăng.');\nif (!caption) return reply('Ảnh/video này chưa có caption nên chưa được đăng.');\nconst journalFile = receiptPath(context.messageId);\ntry { fs.writeFileSync(journalFile, JSON.stringify({ ...context, status: 'received', createdAt: new Date().toISOString(), text: 'Đã nhận bài, đang chuẩn bị đăng.' }), { flag: 'wx', mode: 0o600 }); }\ncatch (error) { if (error.code === 'EEXIST') return []; throw error; }\nreturn [{ json: { ...context, journalFile, caption, isAiGenerated: medium.isAiGenerated, media: [medium], shouldPublish: true } }];\n"
+      }
+    },
+    {
+      "id": "is-album",
+      "name": "Is Album",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        480,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "isAlbum",
+              "leftValue": "={{ $json.isAlbum }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "wait-for-album",
+      "name": "Wait For Album",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        0
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "webhookId": "259ba641-73be-4487-a968-684d0dd25de5"
+    },
+    {
+      "id": "collect-album",
+      "name": "Collect Album",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const publisherConfig = {\"allowedUserIds\":[6729441444],\"allowedChatIds\":[6729441444],\"channelId\":\"6ae04e2c2f1f5ed648e6e5cc\",\"publicBaseUrl\":\"https://parent-duck-lines-muscle.trycloudflare.com\",\"services\":[\"tiktok\",\"facebook\",\"instagram\",\"threads\"],\"albumQuietMs\":3000,\"mediaWebhookId\":\"72b6fa94-2772-4442-bd42-5b4d07e37206\"};\nconst fs = require('fs');\nconst context = $input.first().json;\nconst parts = fs.readdirSync('/files')\n  .filter((name) => name.startsWith(context.albumPrefix + '-') && name.endsWith('.part.json'))\n  .map((name) => JSON.parse(fs.readFileSync('/files/' + name, 'utf8')))\n  .sort((a, b) => a.messageId - b.messageId);\nif (parts.some((part) => Date.now() - part.receivedAt < publisherConfig.albumQuietMs)) return [{ json: { ...context, albumReady: false } }];\ntry { fs.writeFileSync(`/files/${context.albumPrefix}.sealed`, '', { flag: 'wx', mode: 0o600 }); }\ncatch (error) { if (error.code === 'EEXIST') return []; throw error; }\nconst caption = parts.find((part) => part.caption)?.caption;\nconst error = parts.find((part) => part.error)?.error ??\n  (parts.some((part) => part.mediaType !== 'image') ? 'Album trộn video hoặc nhiều video chưa được hỗ trợ.' : undefined) ??\n  (parts.length > 10 ? 'Album vượt giới hạn 10 ảnh.' : undefined) ??\n  (!caption ? 'Album chưa có caption.' : undefined);\nconst json = { ...context, albumReady: true, isAlbum: false, shouldPublish: !error, media: parts, caption, isAiGenerated: false };\nif (error) {\n  json.text = error + ' Toàn bộ album chưa được đăng; không đăng tách từng ảnh.';\n  const saved = JSON.parse(fs.readFileSync(context.journalFile, 'utf8'));\n  fs.writeFileSync(context.journalFile, JSON.stringify({ ...saved, status: 'rejected', text: json.text }));\n}\nreturn [{ json }];\n"
+      }
+    },
+    {
+      "id": "album-ready",
+      "name": "Album Ready",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1200,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "albumReady",
+              "leftValue": "={{ $json.albumReady }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "should-publish",
+      "name": "Should Publish",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "shouldPublish",
+              "leftValue": "={{ $json.shouldPublish }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "resolve-post",
+      "name": "Resolve Post",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1680,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "telegram-accepted",
+      "name": "Telegram Accepted",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        240
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "Đã nhận bài, đang gửi đăng lên các nền tảng đã kết nối. Bot sẽ báo kết quả từng kênh tại đây.",
+        "replyMarkup": "none",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "reply_to_message_id": "={{ $json.messageId }}"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "expand-media",
+      "name": "Expand Media",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const context = $('Resolve Post').first().json; return context.media.map((medium) => ({ json: { ...context, ...medium }, pairedItem: { item: 0 } }));"
+      }
+    },
+    {
+      "id": "download-media",
+      "name": "Download Media",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        480,
+        240
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.fileId }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "prepare-media",
+      "name": "Prepare Media",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const publisherConfig = {\"allowedUserIds\":[6729441444],\"allowedChatIds\":[6729441444],\"channelId\":\"6ae04e2c2f1f5ed648e6e5cc\",\"publicBaseUrl\":\"https://parent-duck-lines-muscle.trycloudflare.com\",\"services\":[\"tiktok\",\"facebook\",\"instagram\",\"threads\"],\"albumQuietMs\":3000,\"mediaWebhookId\":\"72b6fa94-2772-4442-bd42-5b4d07e37206\"};\nconst crypto = require('crypto');\nreturn $input.all().map((item, index) => {\n  const context = $('Expand Media').itemMatching(index).json;\n  if (!item.binary?.data) throw new Error('Telegram chưa trả file ảnh/video.');\n  const name = `${crypto.randomBytes(16).toString('hex')}_${Date.now() + 86400000}.${context.extension}`;\n  const url = `${publisherConfig.publicBaseUrl}/webhook/${publisherConfig.mediaWebhookId}/buffer-media/${name}`;\n  return { json: { ...context, localFile: `/files/${name}`, asset: { [context.mediaType]: { url } } }, binary: { media: item.binary.data }, pairedItem: { item: index } };\n});\n"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "store-media",
+      "name": "Store Media",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        240
+      ],
+      "parameters": {
+        "operation": "write",
+        "fileName": "={{ $json.localFile }}",
+        "dataPropertyName": "media",
+        "options": {}
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "assemble-media",
+      "name": "Assemble Media",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        240
+      ],
+      "parameters": {
+        "jsCode": "const context = $('Resolve Post').first().json; const items = $input.all(); if (items.length !== context.media.length || items.some((item) => item.json.error || !item.json.asset)) throw new Error('Chưa lưu đủ ảnh/video. Không đăng album thiếu ảnh.'); return [{ json: { ...context, assets: items.map((item) => item.json.asset), metadata: context.media[0].mediaType === 'video' ? { tiktok: { isAiGenerated: context.isAiGenerated } } : {} } }];"
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "read-buffer-account",
+      "name": "Read Buffer Account",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1440,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"query\":\"query GetOrganizations { account { organizations { id } } }\"}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "notes": "Bước kiểm tra kết nối: chọn credential Buffer API. Chỉ đọc account/organizations, chưa đăng bài. Source query từ Buffer Quick Start.",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "read-buffer-channels",
+      "name": "Read Buffer Channels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1680,
+        240
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { query: \"query GetChannels($input: ChannelsInput!) { channels(input: $input) { id name service isDisconnected isLocked allowedActions } }\", variables: { input: { organizationId: $json.data.account.organizations[0].id } } } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "notes": "??c danh s?ch k?nh sau khi account ?? ph?n h?i th?nh c?ng. Kh?ng ??ng b?i.",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "id": "build-targets",
+      "name": "Build Targets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        480
+      ],
+      "parameters": {
+        "jsCode": "const publisherConfig = {\"allowedUserIds\":[6729441444],\"allowedChatIds\":[6729441444],\"channelId\":\"6ae04e2c2f1f5ed648e6e5cc\",\"publicBaseUrl\":\"https://parent-duck-lines-muscle.trycloudflare.com\",\"services\":[\"tiktok\",\"facebook\",\"instagram\",\"threads\"],\"albumQuietMs\":3000,\"mediaWebhookId\":\"72b6fa94-2772-4442-bd42-5b4d07e37206\"};\nconst fs = require('fs');\nconst crypto = require('crypto');\nconst context = $('Assemble Media').first().json;\nconst response = $input.first().json;\nif (response.errors?.length || !Array.isArray(response.data?.channels)) return [{ json: { ...context, shouldCreate: false, preparationError: 'Chưa đọc được các kênh đã kết nối. Bài chưa được gửi đăng.' } }];\nconst targets = [];\nfor (const service of publisherConfig.services) {\n  const channels = response.data.channels.filter((channel) => channel.service === service);\n  for (const channel of channels.length ? channels : [{ id: 'missing-' + service, name: '', service, missing: true }]) {\n    const targetFile = `/files/telegram-target-${crypto.createHash('sha256').update(context.journalFile + ':' + channel.id).digest('hex')}.json`;\n    const blocked = channel.missing || channel.isDisconnected || channel.isLocked;\n    const target = { ...context, channelId: channel.id, channelName: channel.name, service, targetFile, shouldCreate: !blocked, status: blocked ? 'unavailable' : 'submitting', error: channel.missing ? 'Chưa kết nối trong Buffer.' : blocked ? 'Kênh bị ngắt kết nối hoặc bị khóa.' : undefined };\n    try { fs.writeFileSync(targetFile, JSON.stringify(target), { flag: 'wx', mode: 0o600 }); }\n    catch (error) { if (error.code !== 'EEXIST') throw error; target.shouldCreate = false; }\n    targets.push(target);\n  }\n}\nconst saved = JSON.parse(fs.readFileSync(context.journalFile, 'utf8'));\nfs.writeFileSync(context.journalFile, JSON.stringify({ ...saved, caption: context.caption, mediaCount: context.assets.length, targets: targets.map((target) => target.targetFile), status: 'processing' }));\nconst requests = targets.filter((target) => target.shouldCreate);\nreturn requests.length ? requests.map((json) => ({ json, pairedItem: { item: 0 } })) : [{ json: { ...context, shouldCreate: false } }];\n"
+      }
+    },
+    {
+      "id": "should-create-targets",
+      "name": "Should Create Targets",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "shouldCreate",
+              "leftValue": "={{ $json.shouldCreate }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "publish-channels",
+      "name": "Publish Channels",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        480
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { query: \"mutation PublishTikTok($input: CreatePostInput!) { createPost(input: $input) { __typename ... on PostActionSuccess { post { id status externalLink error { message } } } ... on InvalidInputError { message } ... on UnauthorizedError { message } ... on NotFoundError { message } ... on UnexpectedError { message } ... on LimitReachedError { message } } }\", variables: { input: { channelId: $json.channelId, text: $json.caption, assets: $json.assets, mode: 'shareNow', schedulingType: 'automatic', needsApproval: false, saveToDraft: false, metadata: $json.service === 'tiktok' ? $json.metadata : {} } } } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "parse-publish-result",
+      "name": "Parse Publish Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        480
+      ],
+      "parameters": {
+        "jsCode": "const resultSource = 'Build Targets';\nreturn $input.all().map((item, index) => {\n  const context = $(resultSource).itemMatching(index).json;\n  const response = item.json;\n  const created = response.data?.createPost;\n  const post = created ? created.post : response.data?.post;\n  const error = response.error ? 'Không xác nhận được kết quả từ API. Không tự gửi lại.' : response.errors?.map((entry) => entry.message).join('\\n') ??\n    (created && created.__typename !== 'PostActionSuccess' ? created.message ?? created.__typename : post?.error?.message);\n  return { json: { ...context, postId: post?.id ?? context.postId, status: response.error || response.errors?.length ? 'unknown' : created && created.__typename !== 'PostActionSuccess' ? 'rejected' : post?.status ?? 'unknown', externalLink: post?.externalLink, error }, pairedItem: { item: index } };\n});\n"
+      }
+    },
+    {
+      "id": "record-targets",
+      "name": "Record Targets",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        480
+      ],
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst crypto = require('crypto');\nfor (const item of $input.all()) {\n  const saved = JSON.parse(fs.readFileSync(item.json.targetFile, 'utf8'));\n  const result = { ...item.json, updatedAt: new Date().toISOString() };\n  // A concurrent, older status response must not downgrade an already sent post.\n  if (saved.status === 'sent' && result.status !== 'sent') continue;\n  const temp = item.json.targetFile + '.' + crypto.randomBytes(8).toString('hex') + '.tmp';\n  fs.writeFileSync(temp, JSON.stringify(result), { mode: 0o600 });\n  fs.renameSync(temp, item.json.targetFile);\n}\nreturn $input.all();\n"
+      }
+    },
+    {
+      "id": "summarize-results",
+      "name": "Summarize Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        480
+      ],
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst crypto = require('crypto');\nconst context = $input.first().json;\nconst saved = JSON.parse(fs.readFileSync(context.journalFile, 'utf8'));\nconst targets = (saved.targets ?? []).map((file) => JSON.parse(fs.readFileSync(file, 'utf8')));\nconst labels = { tiktok: 'TikTok', facebook: 'Facebook Page', instagram: 'Instagram', threads: 'Threads' };\nconst titles = { sent: 'Đã đăng', error: 'Đăng thất bại', rejected: 'Bị từ chối', unavailable: 'Chưa sẵn sàng', sending: 'Đang đăng', scheduled: 'Đang chờ đăng', submitting: 'Chưa xác nhận kết quả', unknown: 'Chưa xác nhận kết quả', draft: 'Bản nháp, chưa đăng', needs_approval: 'Cần duyệt, chưa đăng' };\nconst pending = targets.some((target) => target.postId && ['sending', 'scheduled', 'submitting'].includes(target.status));\nconst text = context.preparationError ?? (targets.length ? 'Kết quả bài đăng:\\n' + targets.map((target) => `${labels[target.service] ?? target.service}${target.channelName ? ' (' + target.channelName + ')' : ''}: ${titles[target.status] ?? target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\\n' + target.externalLink : ''}`).join('\\n\\n') : context.failureMessage ?? 'Chưa có kết quả đăng.');\nconst status = targets.length && targets.every((target) => target.status === 'sent') ? 'sent' : pending ? 'processing' : targets.some((target) => target.status === 'sent') ? 'partial' : 'error';\nconst receipt = { ...saved, status, text, updatedAt: new Date().toISOString() };\nconst temp = context.journalFile + '.' + crypto.randomBytes(8).toString('hex') + '.tmp';\nfs.writeFileSync(temp, JSON.stringify(receipt), { mode: 0o600 });\nfs.renameSync(temp, context.journalFile);\nreturn [{ json: { chatId: saved.chatId, messageId: saved.messageId, journalFile: context.journalFile, queryStatus: context.queryStatus, status, text, shouldPoll: pending && $runIndex < 12 } }];\n"
+      }
+    },
+    {
+      "id": "still-processing",
+      "name": "Still Processing",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1440,
+        480
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "shouldPoll",
+              "leftValue": "={{ $json.shouldPoll }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "wait-for-buffer",
+      "name": "Wait For Buffer",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1680,
+        480
+      ],
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 5,
+        "unit": "seconds"
+      },
+      "webhookId": "d051d9c2-d735-4440-95e9-2f60870cb498"
+    },
+    {
+      "id": "build-status-requests",
+      "name": "Build Status Requests",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        720
+      ],
+      "parameters": {
+        "jsCode": "const fs = require('fs');\nconst context = $input.first().json;\nconst saved = JSON.parse(fs.readFileSync(context.journalFile, 'utf8'));\n// Existing single-channel receipts remain readable; status never creates another post.\nif (!saved.targets?.length && saved.postId) {\n  const targetFile = context.journalFile.replace('telegram-post-', 'telegram-target-legacy-');\n  fs.writeFileSync(targetFile, JSON.stringify({ chatId: context.chatId, messageId: saved.messageId, journalFile: context.journalFile, targetFile, postId: saved.postId, status: saved.status, service: 'tiktok', channelName: 'thieponline.org' }));\n  saved.targets = [targetFile];\n  fs.writeFileSync(context.journalFile, JSON.stringify(saved));\n}\nconst requests = (saved.targets ?? []).map((file) => JSON.parse(fs.readFileSync(file, 'utf8')))\n  .filter((target) => target.postId && (context.queryStatus || ['sending', 'scheduled', 'submitting'].includes(target.status)));\nreturn requests.length ? requests.map((target) => ({ json: { ...target, queryStatus: context.queryStatus, hasStatusRequests: true }, pairedItem: { item: 0 } })) : [{ json: { ...context, hasStatusRequests: false } }];\n"
+      }
+    },
+    {
+      "id": "has-status-requests",
+      "name": "Has Status Requests",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        240,
+        720
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "hasStatusRequests",
+              "leftValue": "={{ $json.hasStatusRequests }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "read-post-status",
+      "name": "Read Post Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        720
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.buffer.com",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { query: \"query PostStatus($input: PostInput!) { post(input: $input) { id status externalLink error { message } } }\", variables: { input: { id: $json.postId } } } }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "parse-status-result",
+      "name": "Parse Status Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        720
+      ],
+      "parameters": {
+        "jsCode": "const resultSource = 'Build Status Requests';\nreturn $input.all().map((item, index) => {\n  const context = $(resultSource).itemMatching(index).json;\n  const response = item.json;\n  const created = response.data?.createPost;\n  const post = created ? created.post : response.data?.post;\n  const error = response.error ? 'Không xác nhận được kết quả từ API. Không tự gửi lại.' : response.errors?.map((entry) => entry.message).join('\\n') ??\n    (created && created.__typename !== 'PostActionSuccess' ? created.message ?? created.__typename : post?.error?.message);\n  return { json: { ...context, postId: post?.id ?? context.postId, status: response.error || response.errors?.length ? 'unknown' : created && created.__typename !== 'PostActionSuccess' ? 'rejected' : post?.status ?? 'unknown', externalLink: post?.externalLink, error }, pairedItem: { item: index } };\n});\n"
+      }
+    },
+    {
+      "id": "is-status-request",
+      "name": "Is Status Request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        720
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "queryStatus",
+              "leftValue": "={{ $json.queryStatus }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "report-preparation-failure",
+      "name": "Report Preparation Failure",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        720
+      ],
+      "parameters": {
+        "jsCode": "const context = $('Resolve Post').first().json; return [{ json: { ...context, failureMessage: 'Không tải/lưu đủ ảnh hoặc video. Toàn bộ bài chưa được gửi đăng.' } }];"
+      }
+    },
+    {
+      "id": "telegram-reply",
+      "name": "Telegram Reply",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1440,
+        720
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendMessage",
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.text.slice(0, 3500).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "replyMarkup": "none",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML",
+          "reply_to_message_id": "={{ $json.messageId }}"
+        }
+      }
+    },
+    {
+      "id": "video-download",
+      "name": "Video Download",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        720
+      ],
+      "parameters": {
+        "httpMethod": [
+          "GET",
+          "HEAD"
+        ],
+        "path": "buffer-media/:fileName",
+        "responseMode": "responseNode",
+        "options": {},
+        "multipleMethods": true
+      },
+      "webhookId": "72b6fa94-2772-4442-bd42-5b4d07e37206"
+    },
+    {
+      "id": "check-media-link",
+      "name": "Check Media Link",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        0,
+        960
+      ],
+      "parameters": {
+        "jsCode": "const name = $input.first().json.params?.fileName;\nconst match = typeof name === 'string' && /^([a-f0-9]{32})_(\\d{13})\\.(mp4|mov|webm|jpg|jpeg|png|webp)$/.exec(name);\nif (!match || Number(match[2]) <= Date.now()) throw new Error('File không tồn tại hoặc link đã hết hạn.');\nconst mimeTypes = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };\nreturn [{ json: { localFile: `/files/${name}`, mimeType: mimeTypes[match[3]] } }];\n"
+      }
+    },
+    {
+      "id": "read-video",
+      "name": "Read Video",
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        240,
+        960
+      ],
+      "parameters": {
+        "operation": "read",
+        "fileSelector": "={{ $json.localFile }}",
+        "options": {
+          "dataPropertyName": "data",
+          "mimeType": "={{ $json.mimeType }}"
+        }
+      }
+    },
+    {
+      "id": "send-video",
+      "name": "Send Video",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        480,
+        960
+      ],
+      "parameters": {
+        "respondWith": "binary",
+        "responseDataSource": "set",
+        "inputFieldName": "data",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Cache-Control",
+                "value": "private, no-store"
+              },
+              {
+                "name": "Content-Disposition",
+                "value": "inline; filename=\"video\""
+              }
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Telegram Intake",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Intake": {
+      "main": [
+        [
+          {
+            "node": "Is Album",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Album": {
+      "main": [
+        [
+          {
+            "node": "Wait For Album",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Should Publish",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Album": {
+      "main": [
+        [
+          {
+            "node": "Collect Album",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Collect Album": {
+      "main": [
+        [
+          {
+            "node": "Album Ready",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Album Ready": {
+      "main": [
+        [
+          {
+            "node": "Should Publish",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait For Album",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Publish": {
+      "main": [
+        [
+          {
+            "node": "Resolve Post",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Status Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resolve Post": {
+      "main": [
+        [
+          {
+            "node": "Telegram Accepted",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram Accepted": {
+      "main": [
+        [
+          {
+            "node": "Expand Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Expand Media": {
+      "main": [
+        [
+          {
+            "node": "Download Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Media": {
+      "main": [
+        [
+          {
+            "node": "Prepare Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Media": {
+      "main": [
+        [
+          {
+            "node": "Store Media",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Preparation Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Media": {
+      "main": [
+        [
+          {
+            "node": "Assemble Media",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assemble Media": {
+      "main": [
+        [
+          {
+            "node": "Read Buffer Account",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Report Preparation Failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Buffer Account": {
+      "main": [
+        [
+          {
+            "node": "Read Buffer Channels",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Buffer Channels": {
+      "main": [
+        [
+          {
+            "node": "Build Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Targets": {
+      "main": [
+        [
+          {
+            "node": "Should Create Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Create Targets": {
+      "main": [
+        [
+          {
+            "node": "Publish Channels",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Publish Channels": {
+      "main": [
+        [
+          {
+            "node": "Parse Publish Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Publish Result": {
+      "main": [
+        [
+          {
+            "node": "Record Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Targets": {
+      "main": [
+        [
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarize Results": {
+      "main": [
+        [
+          {
+            "node": "Still Processing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Still Processing": {
+      "main": [
+        [
+          {
+            "node": "Wait For Buffer",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Buffer": {
+      "main": [
+        [
+          {
+            "node": "Build Status Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Status Requests": {
+      "main": [
+        [
+          {
+            "node": "Has Status Requests",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Status Requests": {
+      "main": [
+        [
+          {
+            "node": "Read Post Status",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Post Status": {
+      "main": [
+        [
+          {
+            "node": "Parse Status Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Status Result": {
+      "main": [
+        [
+          {
+            "node": "Record Targets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Report Preparation Failure": {
+      "main": [
+        [
+          {
+            "node": "Summarize Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Video Download": {
+      "main": [
+        [
+          {
+            "node": "Check Media Link",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Media Link",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Media Link": {
+      "main": [
+        [
+          {
+            "node": "Read Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read Video": {
+      "main": [
+        [
+          {
+            "node": "Send Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Status Request": {
+      "main": [
+        [
+          {
+            "node": "Build Status Requests",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "executionTimeout": 600
+  },
+  "active": false,
+  "pinData": {},
+  "tags": []
+}

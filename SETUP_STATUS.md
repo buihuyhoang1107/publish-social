@@ -1,5 +1,12 @@
 # Setup status — Telegram menu và duyệt bản nháp
 
+> Cập nhật 27/10/2026: **Social Publisher - Telegram Multi Platform** đã bật,
+> nhận một ảnh, album tối đa 10 ảnh hoặc video + caption; gửi đăng các kênh TikTok,
+> Facebook Page, Instagram, Threads đã kết nối. TikTok đã đăng bài thật thành công.
+> Ba kênh Meta chưa kết nối; cần người dùng cấp quyền một lần trong Buffer.
+> Runtime test riêng PASS album 10 ảnh, 4 kênh song song, lỗi từng kênh và chống lặp.
+> Xem [luồng hiện tại](docs/TELEGRAM_PUBLISHER.md). Các trạng thái dưới đây là lịch sử.
+
 Cập nhật: 27/10/2026, giờ Việt Nam (UTC+7).
 
 | Hạng mục | Kết quả thực tế |
@@ -25,8 +32,9 @@ Cập nhật: 27/10/2026, giờ Việt Nam (UTC+7).
 | Menu V2 Telegram callback và preview | PASS theo ảnh — WEDDING/VIRAL, đúng nội dung, DRAFT |
 | Approval runtime | PASS — Duyệt/Sửa/Hủy, sửa giữ media/post ID, nút cũ, duyệt lặp và lưu Data Table riêng |
 | Approval archive | PASS — bảng test chỉ có 1 bài APPROVED sau duyệt lặp và /new; bài hủy không được lưu |
-| Approval Telegram | Người dùng xác nhận đã thấy Duyệt/Sửa/Hủy, đang thử thao tác |
-| Social APIs | Chưa triển khai — Facebook Page là bước tiếp theo sau approval đạt |
+| Approval Telegram | PASS theo ảnh người dùng — bot xác nhận đã duyệt và lưu, trạng thái APPROVED |
+| Facebook Page | Đang hướng dẫn tạo/chọn Meta app; chưa có credential hoặc test kết nối |
+| Social APIs | Chưa triển khai |
 
 Workflow V2 đã có sẵn: [mở trong n8n](http://localhost:5678/workflow/seKtuQgWny3K7y5m).
 Không import lại nếu đang dùng instance này. File JSON vẫn được cung cấp để kiểm
@@ -54,6 +62,5 @@ Không cần cài cloudflared toàn hệ thống; dùng `tools/cloudflared.exe` 
 [hướng dẫn](docs/TELEGRAM_SETUP.md). Portable tải từ
 [release Cloudflare 2026.10.4](https://github.com/cloudflare/cloudflared/releases/tag/2026.10.4).
 
-Bước tiếp theo: gửi `/preview` để mở bài hiện tại kèm nút. Thử Sửa → gửi nội dung
-mới → Duyệt, xác nhận `APPROVED`. Bài được lưu, chưa đăng lên mạng xã hội.
-Workflow đã Published, không cần Execute. Xem [hướng dẫn](docs/TELEGRAM_MENU.md).
+Bước tiếp theo: [tạo/chọn Meta app để kết nối Facebook Page](docs/FACEBOOK_SETUP.md).
+Telegram đã Published và duyệt được; chưa có publisher social.
