@@ -21,6 +21,19 @@ Không cần import lại hay bấm Execute. Xem [menu V2](docs/TELEGRAM_MENU.md
 
 ## Chạy trên Windows
 
+Với instance Telegram hiện tại đã thiết lập, mở Docker Desktop rồi chạy:
+
+```powershell
+node scripts/start-telegram.cjs
+```
+
+Lệnh này khởi động n8n, mở hoặc dùng lại Cloudflare Tunnel, cập nhật URL webhook
+và media, rồi xác nhận webhook với Telegram. Có thể chạy lại khi bot mất kết nối.
+Tunnel chạy ẩn và cần mở lại bằng lệnh này sau khi khởi động lại máy.
+Không cần bấm Execute workflow. Gửi `/queue` để kiểm tra.
+
+Các bước dưới đây dành cho cài đặt lần đầu:
+
 1. Mở Docker Desktop, chờ Engine sẵn sàng.
 2. Tại `D:\publish-social`:
 
