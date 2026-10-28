@@ -6,7 +6,8 @@ const context = { chatId: message.chat.id, messageId: message.message_id, should
 const reply = (text) => [{ json: { ...context, text } }];
 const command = (message.text ?? '').split(/\s/, 1)[0].split('@', 1)[0];
 const platformLabels = { tiktok: 'TikTok', facebook: 'Facebook Page', instagram: 'Instagram', threads: 'Threads' };
-const help = `Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tự gửi đăng lên ${publisherConfig.services.map((service) => platformLabels[service]).join(', ')} đã kết nối. Không cần duyệt.\nVới nhiều ảnh: chọn các ảnh và gửi chung thành một album, nhập caption một lần. Mỗi file tối đa 20 MB.\nVideo AI: thêm /ai ở đầu caption.\nGửi /status để xem kết quả từng nền tảng của bài gần nhất.`;
+const help = publisherConfig.queue?.enabled ? `Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bài gửi vào được tự động duyệt và xếp lịch, không cần /approve.\n/queue — xem kho và lịch\n/cancel <mã bài> — hủy bài chưa gửi Buffer\n/status — xem bài gần nhất\nLịch: 09:00, 14:00, 20:00 hằng ngày (giờ Việt Nam), lên các kênh ${publisherConfig.services.map(service => platformLabels[service]).join(', ')} đã kết nối.\nNhập album một lần, tối đa 10 ảnh. Mỗi file tối đa 20 MB. /ai ở đầu caption cho video AI. Threads tối đa 499 ký tự; bài dài sẽ bỏ qua kênh này.\nMáy, Docker và tunnel phải chạy đến khi các bài đăng xong để Buffer lấy media.` : `Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tự gửi đăng lên ${publisherConfig.services.map((service) => platformLabels[service]).join(', ')} đã kết nối. Không cần duyệt.\nVới nhiều ảnh: chọn các ảnh và gửi chung thành một album, nhập caption một lần. Mỗi file tối đa 20 MB.\nVideo AI: thêm /ai ở đầu caption.\nGửi /status để xem kết quả từng nền tảng của bài gần nhất.`;
+if (publisherConfig.queue?.enabled && ['/queue', '/approve', '/cancel'].includes(command)) return [{ json: { ...context, queueCommand: true, commandText: (message.text ?? '').replace(/^\/\w+(?:@\w+)?/, command), replyMessageId: message.reply_to_message?.message_id } }];
 if (command === '/status') {
   let target = message.reply_to_message?.message_id ?? Number((message.text ?? '').split(/\s+/)[1]);
   if (!Number.isSafeInteger(target) || target <= 0) {
@@ -30,6 +31,10 @@ if (command === '/status') {
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
     return reply('Chưa có yêu cầu đăng cho tin nhắn này.');
+  }
+  if (publisherConfig.queue?.enabled && saved.queuePostId) {
+    const post = queueStore.read().posts.find(item => item.id === saved.queuePostId && item.chatId === context.chatId);
+    if (post) return reply(`Bài #${post.messageId} — ${queueStore.labels[post.status]}${post.dueAt ? '\nLịch: ' + queueStore.formatTime(post.dueAt) + ' (giờ Việt Nam)' : ''}\n${post.caption.slice(0, 800)}\n` + (post.targets ?? []).map(target => `${queueStore.platforms[target.service] ?? target.service}: ${target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\n' + target.externalLink : ''}`).join('\n'));
   }
   if (!saved.targets?.length && !saved.postId) return reply(saved.text ?? 'Bài đang được chuẩn bị, chưa có kết quả đăng.');
   return [{ json: { ...context, messageId: saved.messageId, journalFile, queryStatus: true } }];

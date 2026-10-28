@@ -1,5 +1,14 @@
 # Setup status — Telegram menu và duyệt bản nháp
 
+> Cập nhật 28/10/2026: bài mới gửi qua Telegram được **tự động duyệt và xếp lịch**,
+> không cần `/approve`. Giữ lịch 09:00–14:00–20:00 giờ Việt Nam; nháp cũ vẫn có thể
+> duyệt bằng `/approve`. Kiểm tra trên mock riêng, không tạo bài thử thật.
+
+> Cập nhật 28/10/2026: triển khai kho nội dung, duyệt theo lô `/approve all`, lịch
+> 09:00–14:00–20:00 giờ Việt Nam và worker 5 phút. Gửi media chỉ lưu nháp, không đăng ngay.
+> Có chống trùng nội dung/tin nhắn, kiểm tra sức chứa Buffer, tự bổ sung lịch, báo sắp hết
+> bài và bỏ qua khung trống. Xem [hướng dẫn kho bài](docs/CONTENT_QUEUE.md).
+
 > Cập nhật 27/10/2026: **Social Publisher - Telegram Multi Platform** đã bật,
 > nhận một ảnh, album tối đa 10 ảnh hoặc video + caption; gửi đăng các kênh TikTok,
 > Facebook Page, Threads đã kết nối. TikTok đã đăng bài thật thành công.

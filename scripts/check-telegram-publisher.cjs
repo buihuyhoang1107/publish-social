@@ -14,6 +14,9 @@ if (process.argv.includes('--prepare')) {
   }
   const config = { allowedUserIds: [456], allowedChatIds: [456], services, albumQuietMs: 3000, publicBaseUrl: 'http://127.0.0.1:5678', mediaWebhookId: w.nodes.find(n => n.name === 'Video Download').webhookId };
   w.id = 'telegramPublisherTest'; w.versionId = require('node:crypto').randomUUID(); w.name = 'Telegram Multi Publisher Isolated Test';
+  w.nodes.find(n => n.name === 'Queue Schedule').disabled = true;
+  w.connections['Assemble Media'] = { main: [[{ node: 'Read Buffer Account', type: 'main', index: 0 }], w.connections['Assemble Media'].main[1]] };
+  delete w.connections['Telegram Reply'];
   const trigger = w.nodes.find(n => n.name === 'Telegram Trigger');
   trigger.type = 'n8n-nodes-base.webhook'; trigger.typeVersion = 2;
   trigger.parameters = { httpMethod: 'POST', path: 'telegram-publisher-check', responseMode: 'lastNode', options: {} };
@@ -49,12 +52,15 @@ if (process.argv.includes('--prepare')) {
       if (req.url === '/settings') { missing = body.missing ?? []; res.end('{}'); return; }
       if (body.query.includes('GetOrganizations')) { res.end(JSON.stringify({ data: { account: { organizations: [{ id: 'test-org' }] } } })); return; }
       if (body.query.includes('GetChannels')) { res.end(JSON.stringify({ data: { channels: services.filter(s => !missing.includes(s)).map(service => ({ id: 'test-' + service, service, name: 'Test ' + service, isDisconnected: false, isLocked: false })) } })); return; }
+      if (body.query.includes('PendingQueuePosts')) { res.end(JSON.stringify({ data: { posts: { edges: [...posts.values()].filter(post => ['scheduled', 'sending'].includes(post.status)).map(node => ({ node })), pageInfo: { hasNextPage: false } } } })); return; }
       const input = body.variables.input;
       if (body.query.startsWith('mutation')) {
         publishing = true; active++; maxActive = Math.max(maxActive, active);
         const call = { ...input, contents: [] }; calls.push(call);
         assert.ok(services.some(s => 'test-' + s === input.channelId));
-        assert.equal(input.mode, 'shareNow'); assert.equal(input.schedulingType, 'automatic'); assert.equal(input.needsApproval, false); assert.equal(input.saveToDraft, false);
+        assert.ok(['shareNow', 'customScheduled'].includes(input.mode));
+        if (input.mode === 'customScheduled') assert.ok(Date.parse(input.dueAt) > Date.now());
+        assert.equal(input.schedulingType, 'automatic'); assert.equal(input.needsApproval, false); assert.equal(input.saveToDraft, false);
         if (input.channelId === 'test-facebook') assert.deepEqual(input.metadata, { facebook: { type: 'post' } });
         else if (input.channelId !== 'test-tiktok' || input.assets[0].image) assert.deepEqual(input.metadata, {}, 'Platform/video-specific metadata must not leak to other post types');
         if (input.channelId === 'test-threads') assert.ok(Array.from(input.text).length <= 499, 'Overlong captions must never reach the Threads API');
@@ -69,8 +75,8 @@ if (process.argv.includes('--prepare')) {
         if (input.text === 'partial-error' && input.channelId === 'test-facebook') { res.end(JSON.stringify({ errors: [{ message: 'Facebook test rejection' }] })); return; }
         if (input.text === 'network-error' && input.channelId === 'test-instagram') { res.writeHead(503); res.end('{}'); return; }
         const id = 'test-post-' + calls.indexOf(call);
-        posts.set(id, { id, status: 'sent', externalLink: 'https://example.com/' + id, error: null });
-        res.end(JSON.stringify({ data: { createPost: { __typename: 'PostActionSuccess', post: { id, status: 'sending', error: null } } } }));
+        posts.set(id, { id, channelId: input.channelId, dueAt: input.dueAt, status: input.mode === 'customScheduled' ? 'scheduled' : 'sent', externalLink: 'https://example.com/' + id, error: null });
+        res.end(JSON.stringify({ data: { createPost: { __typename: 'PostActionSuccess', post: { id, status: input.mode === 'customScheduled' ? 'scheduled' : 'sending', error: null } } } }));
       } else {
         assert.ok(posts.has(input.id)); res.end(JSON.stringify({ data: { post: posts.get(input.id) } }));
       }

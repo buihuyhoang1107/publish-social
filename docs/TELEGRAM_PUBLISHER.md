@@ -1,5 +1,10 @@
 # Đăng album và nhiều nền tảng từ Telegram
 
+> **Cập nhật 28/10/2026:** bot chuyển sang kho nháp và duyệt theo lô.
+> Gửi ảnh/video không đăng ngay. Dùng `/queue` xem kho, `/approve all` duyệt;
+> bot xếp lịch **09:00, 14:00, 20:00 giờ Việt Nam**, tự bổ sung khi có chỗ và báo sắp hết bài.
+> Xem [hướng dẫn hiện tại](CONTENT_QUEUE.md). Các mô tả đăng ngay bên dưới là luồng cũ.
+
 Luồng: **Telegram → n8n → Buffer → TikTok / Facebook Page / Threads → kết quả về Telegram**.
 Bạn dùng bot Telegram hiện có để đăng bài. Buffer chỉ cần mở khi kết nối tài khoản.
 Đã bật tự phát hiện các kênh thuộc ba nền tảng này trong Buffer mỗi lần đăng.

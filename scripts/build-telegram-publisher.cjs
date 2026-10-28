@@ -6,8 +6,10 @@ if (!config.allowedUserIds?.length || !config.allowedChatIds?.length || !config.
 const buffer = JSON.parse(fs.readFileSync(path.join(root, 'workflows/buffer-publisher.json'), 'utf8'));
 config.mediaWebhookId = buffer.nodes.find((item) => item.name === 'Video Download').webhookId;
 config.albumQuietMs ??= 3000;
+config.queue ??= { enabled: true, hours: [9, 14, 20], lowWatermark: 3, maxPendingPerChannel: 9 };
+if (config.queue.enabled && JSON.stringify(config.queue.hours) !== '[9,14,20]') throw new Error('Khung giờ được duyệt: 09:00, 14:00, 20:00 giờ Việt Nam.');
 const code = (name) => fs.readFileSync(path.join(root, `workflows/code/${name}.js`), 'utf8');
-const inject = (name) => 'const publisherConfig = ' + JSON.stringify(config) + ';\n' + code(name);
+const inject = (name) => 'const publisherConfig = ' + JSON.stringify(config) + ';\n' + (name.startsWith('telegram-queue-') || name === 'telegram-album-intake' ? code('telegram-queue-store') + '\n' : '') + code(name);
 const node = (name, type, version, parameters, extra = {}) => ({ id: name.toLowerCase().replaceAll(' ', '-'), name, type: `n8n-nodes-base.${type}`, typeVersion: version, position: [0, 0], parameters, ...extra });
 const condition = (key) => ({ conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 }, conditions: [{ id: key, leftValue: `={{ $json.${key} }}`, rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' }, options: {} });
 const http = buffer.nodes.find((item) => item.name === 'Read Buffer Account').parameters;
@@ -23,7 +25,7 @@ const nodes = [
   node('Album Ready', 'if', 2.2, condition('albumReady')),
   node('Should Publish', 'if', 2.2, condition('shouldPublish')),
   node('Resolve Post', 'noOp', 1, {}),
-  node('Telegram Accepted', 'telegram', 1.2, { resource: 'message', operation: 'sendMessage', chatId: '={{ $json.chatId }}', text: "={{ 'Đã nhận bài, đang gửi đăng lên các nền tảng đã kết nối. Bot sẽ báo kết quả từng kênh tại đây.' + (" + JSON.stringify(config.services.includes('threads')) + " && Array.from($json.caption).length > 499 ? '\\nLưu ý: caption có ' + Array.from($json.caption).length + ' ký tự, vượt mức tối đa 499 ký tự đã cấu hình. Bot sẽ bỏ qua Threads, không gửi đăng lên Threads. Các nền tảng khác vẫn tiếp tục.' : '') }}", replyMarkup: 'none', additionalFields: replyFields }, { onError: 'continueRegularOutput' }),
+  node('Telegram Accepted', 'telegram', 1.2, { resource: 'message', operation: 'sendMessage', chatId: '={{ $json.chatId }}', text: "={{ " + JSON.stringify(config.queue.enabled ? 'Đã nhận bài, đang tải ảnh/video để lưu nháp. Bài chỉ được xếp lịch sau khi bạn duyệt.' : 'Đã nhận bài, đang gửi đăng lên các nền tảng đã kết nối. Bot sẽ báo kết quả từng kênh tại đây.') + " + (" + JSON.stringify(config.services.includes('threads')) + " && Array.from($json.caption).length > 499 ? '\\nLưu ý: caption có ' + Array.from($json.caption).length + ' ký tự, vượt mức tối đa 499 ký tự đã cấu hình. Bot sẽ bỏ qua Threads, không gửi đăng lên Threads. Các nền tảng khác vẫn tiếp tục.' : '') }}", replyMarkup: 'none', additionalFields: replyFields }, { onError: 'continueRegularOutput' }),
   node('Expand Media', 'code', 2, { jsCode: "const context = $('Resolve Post').first().json; return context.media.map((medium) => ({ json: { ...context, ...medium }, pairedItem: { item: 0 } }));" }),
   node('Download Each Media', 'splitInBatches', 3, { batchSize: 1, options: {} }),
   node('Download Media', 'telegram', 1.2, { resource: 'file', operation: 'get', fileId: '={{ $json.fileId }}', download: true, additionalFields: {} }, { onError: 'continueRegularOutput', retryOnFail: true, maxTries: 3, waitBetweenTries: 2000 }),
@@ -46,6 +48,25 @@ const nodes = [
   node('Is Status Request', 'if', 2.2, condition('queryStatus')),
   node('Report Preparation Failure', 'code', 2, { jsCode: "const context = $('Resolve Post').first().json; return [{ json: { ...context, failureMessage: 'Không tải/lưu đủ ảnh hoặc video. Toàn bộ bài chưa được gửi đăng.' } }];" }),
   node('Telegram Reply', 'telegram', 1.2, { resource: 'message', operation: 'sendMessage', chatId: '={{ $json.chatId }}', text: "={{ $json.text.slice(0, 3500).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}", replyMarkup: 'none', additionalFields: replyFields }),
+  node('Save Content Draft', 'code', 2, { jsCode: inject('telegram-queue-save') }, { onError: 'continueErrorOutput' }),
+  node('Is Queue Command', 'if', 2.2, condition('queueCommand')),
+  node('Handle Queue Command', 'code', 2, { jsCode: inject('telegram-queue-command') }),
+  node('Run Queue After Reply', 'if', 2.2, { ...condition('runQueue'), conditions: { ...condition('runQueue').conditions, conditions: [{ ...condition('runQueue').conditions.conditions[0], leftValue: "={{ ($('Save Content Draft').isExecuted && $('Save Content Draft').first().json.runQueue === true) || ($('Handle Queue Command').isExecuted && $('Handle Queue Command').first().json.runQueue === true) }}" }] } }),
+  node('Queue Schedule', 'scheduleTrigger', 1.2, { rule: { interval: [{ field: 'cronExpression', expression: '0 */5 * * * *' }] } }, { disabled: !config.queue.enabled }),
+  node('Start Queue Worker', 'code', 2, { jsCode: inject('telegram-queue-start') }),
+  node('Queue Needs Channels', 'if', 2.2, condition('needsChannels')),
+  node('Queue Account', 'httpRequest', 4.2, { ...http }, { onError: 'continueRegularOutput', retryOnFail: false }),
+  node('Queue Channels', 'httpRequest', 4.2, { ...http, jsonBody: "={{ { query: 'query GetChannels($input: ChannelsInput!) { channels(input: $input) { id name service isDisconnected isLocked } }', variables: { input: { organizationId: $json.data?.account?.organizations?.[0]?.id ?? '' } } } }}" }, { onError: 'continueRegularOutput', retryOnFail: false }),
+  node('Queue Pending Posts', 'httpRequest', 4.2, { ...http, jsonBody: "={{ { query: 'query PendingQueuePosts($input: PostsInput!) { posts(first: 100, input: $input) { edges { node { id channelId dueAt } } pageInfo { hasNextPage } } }', variables: { input: { organizationId: $('Queue Account').first().json.data?.account?.organizations?.[0]?.id ?? '', filter: { status: ['scheduled', 'sending'], channelIds: $json.data?.channels?.filter(channel => " + JSON.stringify(config.services) + ".includes(channel.service)).map(channel => channel.id) ?? [] } } } } }}" }, { onError: 'continueRegularOutput', retryOnFail: false }),
+  node('Next Queue Work', 'code', 2, { jsCode: inject('telegram-queue-work') }),
+  node('Has Queue Work', 'if', 2.2, condition('hasWork')),
+  node('Is Queue Notification', 'if', 2.2, { conditions: { options: { caseSensitive: true, typeValidation: 'strict', version: 2 }, conditions: [{ id: 'notify', leftValue: '={{ $json.action }}', rightValue: 'notify', operator: { type: 'string', operation: 'equals' } }], combinator: 'and' }, options: {} }),
+  node('Is Queue Create', 'if', 2.2, { conditions: { options: { caseSensitive: true, typeValidation: 'strict', version: 2 }, conditions: [{ id: 'create', leftValue: '={{ $json.action }}', rightValue: 'create', operator: { type: 'string', operation: 'equals' } }], combinator: 'and' }, options: {} }),
+  node('Schedule Queue Post', 'httpRequest', 4.2, { ...http, jsonBody: `={{ { query: ${mutation}, variables: { input: $json.input } } }}` }, { onError: 'continueRegularOutput', retryOnFail: false }),
+  node('Read Queue Post Status', 'httpRequest', 4.2, { ...http, jsonBody: "={{ { query: 'query PostStatus($input: PostInput!) { post(input: $input) { id status externalLink error { message } } }', variables: { input: { id: $json.postId } } } }}" }, { onError: 'continueRegularOutput', retryOnFail: false }),
+  node('Record Queue Result', 'code', 2, { jsCode: inject('telegram-queue-result') }),
+  node('Queue Notification', 'telegram', 1.2, { resource: 'message', operation: 'sendMessage', chatId: '={{ $json.chatId }}', text: "={{ $json.text.slice(0, 3500).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}", replyMarkup: 'none', additionalFields: { appendAttribution: false, parse_mode: 'HTML' } }, { onError: 'continueRegularOutput', retryOnFail: false }),
+  node('Record Queue Notification', 'code', 2, { jsCode: inject('telegram-queue-notified') }),
 ];
 for (const name of ['Video Download', 'Check Media Link', 'Read Video', 'Send Video']) nodes.push(structuredClone(buffer.nodes.find((item) => item.name === name)));
 nodes.find((item) => item.name === 'Check Media Link').parameters.jsCode = code('telegram-publisher-media-request');
@@ -59,10 +80,21 @@ for (const sequence of [
 ]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
 link('Is Album', 'Should Publish', 1); link('Album Ready', 'Wait For Album', 1);
 link('Download Each Media', 'Download Media', 1); link('Download Media', 'Download Each Media');
-link('Should Publish', 'Is Status Request', 1); link('Is Status Request', 'Build Status Requests'); link('Is Status Request', 'Telegram Reply', 1);
+link('Should Publish', 'Is Queue Command', 1); link('Is Queue Command', 'Handle Queue Command'); link('Is Queue Command', 'Is Status Request', 1);
+link('Handle Queue Command', 'Telegram Reply'); link('Is Status Request', 'Build Status Requests'); link('Is Status Request', 'Telegram Reply', 1);
 link('Should Create Targets', 'Summarize Results', 1); link('Has Status Requests', 'Summarize Results', 1);
 link('Still Processing', 'Telegram Reply', 1); link('Video Download', 'Check Media Link', 1);
 for (const name of ['Prepare Media', 'Assemble Media']) link(name, 'Report Preparation Failure', 1);
+if (config.queue.enabled) link('Assemble Media', 'Save Content Draft');
+link('Save Content Draft', 'Telegram Reply'); link('Save Content Draft', 'Report Preparation Failure', 1);
+link('Telegram Reply', 'Run Queue After Reply'); link('Run Queue After Reply', 'Start Queue Worker');
+for (const sequence of [
+  ['Queue Schedule', 'Start Queue Worker', 'Queue Needs Channels', 'Queue Account', 'Queue Channels', 'Queue Pending Posts', 'Next Queue Work', 'Has Queue Work', 'Is Queue Notification', 'Queue Notification', 'Record Queue Notification', 'Next Queue Work'],
+  ['Schedule Queue Post', 'Record Queue Result', 'Next Queue Work'],
+  ['Read Queue Post Status', 'Record Queue Result'],
+]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
+link('Is Queue Notification', 'Is Queue Create', 1); link('Is Queue Create', 'Schedule Queue Post'); link('Is Queue Create', 'Read Queue Post Status', 1);
+link('Queue Needs Channels', 'Next Queue Work', 1);
 // Keep the main route left to right; the two loops and public media route sit below it.
 for (let i = 0; i < nodes.length; i++) nodes[i].position = [(i % 8) * 240, Math.floor(i / 8) * 240];
 const workflow = { name: 'Social Publisher - Telegram Multi Platform', nodes, connections, settings: { executionOrder: 'v1', timezone: 'Asia/Ho_Chi_Minh', executionTimeout: 600 }, active: false, pinData: {}, tags: [] };
