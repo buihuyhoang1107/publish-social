@@ -59,7 +59,13 @@ const queueStore = (() => {
     else post.status = 'attention';
     if (targets.some(target => ['planned', 'submitting'].includes(target.status))) return;
     const signature = crypto.createHash('sha256').update(JSON.stringify(targets.map(target => [target.channelId, target.status, target.error, target.externalLink]))).digest('hex');
-    const text = `Bài #${post.messageId} — ${labels[post.status]}\nLịch: ${formatTime(post.dueAt)} (giờ Việt Nam)\n` + targets.map(target => `${platforms[target.service] ?? target.service}${target.channelName ? ' (' + target.channelName + ')' : ''}: ${{ scheduled: 'Đã lên lịch', sending: 'Đang đăng', sent: 'Đã đăng', skipped: 'Bỏ qua', unavailable: 'Chưa sẵn sàng', rejected: 'Bị từ chối', error: 'Lỗi', unknown: 'Chưa xác nhận, không tự gửi lại' }[target.status] ?? target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\n' + target.externalLink : ''}`).join('\n');
+    const sentCount = targets.filter(target => target.status === 'sent').length;
+    const heading = sentCount
+      ? `✅ Vừa đăng bài #${post.messageId} thành công trên ${sentCount}/${targets.length} kênh.`
+      : `Bài #${post.messageId} — ${labels[post.status]}`;
+    const text = `${heading}\nLịch: ${formatTime(post.dueAt)} (giờ Việt Nam)\n` +
+      (sentCount ? `Xác nhận lúc: ${formatTime(now())} (giờ Việt Nam)\nNội dung: ${Array.from(post.caption).slice(0, 200).join('')}${Array.from(post.caption).length > 200 ? '…' : ''}\n\n` : '') +
+      targets.map(target => `${platforms[target.service] ?? target.service}${target.channelName ? ' (' + target.channelName + ')' : ''}: ${{ scheduled: 'Đã lên lịch', sending: 'Đang đăng', sent: 'Đã đăng', skipped: 'Bỏ qua', unavailable: 'Chưa sẵn sàng', rejected: 'Bị từ chối', error: 'Lỗi', unknown: 'Chưa xác nhận, không tự gửi lại' }[target.status] ?? target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\n' + target.externalLink : ''}`).join('\n');
     addNotice(state, post.id + ':' + signature, post.chatId, text);
   };
   const maintain = (state) => {

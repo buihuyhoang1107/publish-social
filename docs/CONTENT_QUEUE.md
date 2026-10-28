@@ -34,6 +34,11 @@ từ 500 ký tự, bot cảnh báo và bỏ qua Threads, vẫn xếp lịch cho 
   và có chỗ, worker tự bổ sung vào khung tương lai. Không yêu cầu duyệt lại.
 - Worker kiểm tra mỗi 5 phút. Khi không có bài cần xếp lịch, không gọi lại API account,
   channel và danh sách hàng đợi; chỉ kiểm tra các bài đến giờ và thông báo cần gửi.
+- Khi Buffer xác nhận trạng thái `sent`, bot gửi “✅ Vừa đăng bài #… thành công trên
+  …/… kênh” về chat đã gửi bài, kèm caption rút gọn, lịch, thời điểm xác nhận và link
+  từng kênh nếu API trả về. Kênh lỗi/chưa đăng vẫn hiển thị đúng trạng thái riêng.
+  Thông báo có thể trễ khoảng 5 phút hoặc lâu hơn nếu Buffer/mạng chưa xác nhận.
+  Kết quả không đổi không tạo thông báo lặp; kênh khác đăng xong sẽ có cập nhật tiếp.
 - Khi còn tối đa 3 bài đã duyệt/đã xếp lịch cho tương lai, bot nhắc bổ sung một lần.
   Nhắc được đặt lại khi kho được bổ sung vượt ngưỡng. Không lặp thông báo mỗi 5 phút.
 - Đến khung giờ không có bài đã được xếp lịch, bot thông báo bỏ qua khung đó một lần.
