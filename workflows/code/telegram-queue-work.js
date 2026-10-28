@@ -10,7 +10,15 @@ const result = queueStore.transact(state => {
   const notice = state.notices.find(item => item.status === 'ready');
   if (notice) {
     notice.status = 'claimed'; notice.claimedAt = Date.now();
-    return { action: 'notify', hasWork: true, noticeId: notice.id, chatId: notice.chatId, text: notice.text };
+    return { action: 'notify', hasWork: true, noticeId: notice.id, chatId: notice.chatId, text: notice.text, retryMessageId: notice.retryMessageId };
+  }
+  for (const post of state.posts) for (const target of post.targets ?? []) {
+    if (!target.retryRequested || !['error', 'rejected'].includes(target.status)) continue;
+    const retryId = target.retryRequested;
+    delete target.retryRequested;
+    target.retryPreviousStatus = target.status;
+    target.status = 'retrying'; target.claimedAt = Date.now(); target.retryId = retryId;
+    return { action: 'retry', hasWork: true, queuePostId: post.id, channelId: target.channelId, postId: target.postId, hasPostId: Boolean(target.postId), retryKind: target.postId ? 'edit' : 'create', retryId };
   }
   for (const post of state.posts) for (const target of post.targets ?? []) {
     if (target.postId && ['scheduled', 'sending', 'unknown'].includes(target.status) && Date.parse(post.dueAt) <= Date.now() && Date.now() - (target.polledAt ?? 0) >= 300000) {

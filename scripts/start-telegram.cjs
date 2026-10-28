@@ -160,6 +160,9 @@ async function main() {
   }
   await waitHealthy(url);
   docker(['exec', '-T', 'n8n', 'node', '-e', registerWebhook, containerWorkflowFile], { stdio: 'inherit' });
+  console.log('Kiem tra link media cua cac bai da xep lich tren Buffer...');
+  docker(['cp', 'scripts/repair-buffer-media.cjs', 'n8n:/tmp/repair-buffer-media.cjs']);
+  docker(['exec', '-T', 'n8n', 'node', '/tmp/repair-buffer-media.cjs', containerWorkflowFile], { stdio: 'inherit' });
   console.log('San sang. Mo http://localhost:5678 va gui /queue cho bot.');
 }
 

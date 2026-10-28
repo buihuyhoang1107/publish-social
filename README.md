@@ -28,7 +28,8 @@ node scripts/start-telegram.cjs
 ```
 
 Lệnh này khởi động n8n, mở hoặc dùng lại Cloudflare Tunnel, cập nhật URL webhook
-và media, rồi xác nhận webhook với Telegram. Có thể chạy lại khi bot mất kết nối.
+và media, xác nhận webhook với Telegram và sửa link media của các bài còn chờ trên
+Buffer khi URL đổi (giữ nội dung/giờ đăng). Có thể chạy lại khi bot mất kết nối.
 Tunnel chạy ẩn và cần mở lại bằng lệnh này sau khi khởi động lại máy.
 Không cần bấm Execute workflow. Gửi `/queue` để kiểm tra.
 

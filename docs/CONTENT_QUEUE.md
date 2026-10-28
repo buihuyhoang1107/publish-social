@@ -19,6 +19,15 @@ Workflow vẫn dùng bot Telegram hiện tại, n8n và Buffer; không tự sinh
    để xem cùng bài đó. Trạng thái được kiểm tra định kỳ sau giờ hẹn; không đăng lại.
 6. `/cancel 123` hủy nháp hoặc bài đã duyệt còn đang chờ trong kho. Bài đã bắt đầu
    gửi lịch sang Buffer phải được hủy tại Buffer; bot không báo hủy thành công cho bài này.
+7. Thông báo lỗi có nút **🔄 Đăng lại kênh lỗi**. Bấm để yêu cầu khôi phục những
+   kênh có lỗi đã xác nhận; hoặc dùng `/retry 123`. `/status 123` cũng hiện nút nếu
+   còn kênh đủ điều kiện. Bot kiểm tra lại trạng thái Buffer và tải đủ media qua link
+   công khai. Bài có lịch tương lai giữ đúng ngày/giờ đã hẹn, kể cả kênh từng bị từ chối
+   trước khi có post ID; chỉ bài đã đến/qua giờ hẹn mới được đăng lại ngay. Bot
+   đối chiếu nội dung file trước khi gửi. Kênh đã đăng/đang đăng/đã lên lịch
+   hoặc chưa xác nhận kết quả không bị gửi lại. Bấm lặp khi đang xử lý không tạo thêm lần gửi.
+   Kênh lỗi có post ID dùng lại bài Buffer đó; yêu cầu bị từ chối trước khi có post ID
+   mới tạo bài thay thế cho riêng kênh đó. Không tự đăng lại khi chưa bấm nút/lệnh.
 
 Ảnh/video phải có caption, mỗi file tối đa 20 MB. Album không trộn ảnh và video.
 Video AI dùng `/ai` đầu caption như trước. Threads tối đa 499 ký tự Unicode code point;
@@ -55,8 +64,12 @@ máy đang phục vụ file. Đây là yêu cầu của [Buffer Hosting Media](h
 Media của kho có URL chứa token ngẫu nhiên, tên `queue_<32 hex>.<extension>`,
 không hết hạn sau 24 giờ. File không tự bị xóa. Không chia sẻ link media riêng tư.
 Chỉ filename đúng whitelist mới được phục vụ; không cho truy cập file kho/receipt.
-Quick Tunnel hiện tại đổi URL khi khởi động lại: nếu URL thay đổi, các lịch đã gửi
-Buffer vẫn giữ URL cũ và cần cập nhật trước giờ đăng. Muốn vận hành lâu dài nên
+Quick Tunnel hiện tại đổi URL khi khởi động lại. Chạy `node scripts/start-telegram.cjs`
+để cập nhật cả webhook và link media của bài còn chờ trên Buffer. Script tải và đối
+chiếu hash từng ảnh/video trước khi sửa; giữ nguyên nội dung và giờ đăng, sao lưu
+trước sửa vào `/home/node/.n8n/storage/media-repair`. Bài đã lỗi, đang đăng hoặc còn
+dưới 5 phút tới giờ đăng không tự được sửa/đăng lại; cần kiểm tra riêng trên Buffer.
+Nếu script báo lỗi thì chưa thể coi các lịch cũ đã được khôi phục. Muốn vận hành lâu dài nên
 dùng hostname cố định hoặc chuyển cả n8n và media lên máy chủ/storage ổn định.
 
 ## Dữ liệu và chống trùng
@@ -84,6 +97,11 @@ Worker gửi `customScheduled` và `dueAt` UTC theo [API Buffer](https://develop
 - `scripts/check-content-queue.cjs`: kiểm tra kho, duyệt, hủy, dedup, lịch/múi giờ,
   sức chứa local/Buffer, bổ sung lịch, thông báo hết bài và crash/mạng không xác định.
   Chạy trong Linux/n8n container với bản source trong thư mục writable tạm.
+- `scripts/check-queue-retry.cjs`, `scripts/check-retry-native.cjs` và
+  `scripts/check-retry-runtime.cjs`: callback phân quyền, nút Telegram thật, kiểm tra
+  media, chống gửi lặp, retry bài cũ/tạo thay thế cho kênh bị từ chối và timeout.
+  Runtime dùng DB/thư mục riêng `/tmp/queue-retry-runtime` cùng API giả lập,
+  không có credential Telegram/Buffer và không đăng bài thật.
 - `scripts/check-queue-runtime.cjs --prepare`: fixture riêng, webhook test, mock media
   và Buffer, không có credential. Chạy sau khi chuẩn bị fixture legacy bằng
   `scripts/check-telegram-publisher.cjs --prepare`. Publish fixture `telegramQueueTest`

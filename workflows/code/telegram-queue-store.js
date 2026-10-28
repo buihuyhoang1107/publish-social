@@ -47,17 +47,17 @@ const queueStore = (() => {
     }
     throw new Error('Không tìm được khung giờ trống trong một năm tới.');
   };
-  const addNotice = (state, id, chatId, text) => {
-    if (!state.notices.some(notice => notice.id === id)) state.notices.push({ id, chatId, text, status: 'ready' });
+  const addNotice = (state, id, chatId, text, retryMessageId) => {
+    if (!state.notices.some(notice => notice.id === id)) state.notices.push({ id, chatId, text, retryMessageId, status: 'ready' });
   };
   const refresh = (state, post) => {
     if (!post.targets?.length) return;
     const targets = post.targets;
-    if (targets.some(target => ['planned', 'submitting'].includes(target.status))) post.status = 'scheduling';
+    if (targets.some(target => ['planned', 'submitting', 'retrying'].includes(target.status))) post.status = 'scheduling';
     else if (targets.every(target => target.status === 'sent')) post.status = 'sent';
     else if (targets.some(target => ['sent', 'scheduled', 'sending'].includes(target.status))) post.status = targets.some(target => ['error', 'unknown', 'rejected', 'unavailable', 'skipped'].includes(target.status)) ? 'partial' : 'scheduled';
     else post.status = 'attention';
-    if (targets.some(target => ['planned', 'submitting'].includes(target.status))) return;
+    if (targets.some(target => ['planned', 'submitting', 'retrying'].includes(target.status))) return;
     const signature = crypto.createHash('sha256').update(JSON.stringify(targets.map(target => [target.channelId, target.status, target.error, target.externalLink]))).digest('hex');
     const sentCount = targets.filter(target => target.status === 'sent').length;
     const heading = sentCount
@@ -66,11 +66,17 @@ const queueStore = (() => {
     const text = `${heading}\nLịch: ${formatTime(post.dueAt)} (giờ Việt Nam)\n` +
       (sentCount ? `Xác nhận lúc: ${formatTime(now())} (giờ Việt Nam)\nNội dung: ${Array.from(post.caption).slice(0, 200).join('')}${Array.from(post.caption).length > 200 ? '…' : ''}\n\n` : '') +
       targets.map(target => `${platforms[target.service] ?? target.service}${target.channelName ? ' (' + target.channelName + ')' : ''}: ${{ scheduled: 'Đã lên lịch', sending: 'Đang đăng', sent: 'Đã đăng', skipped: 'Bỏ qua', unavailable: 'Chưa sẵn sàng', rejected: 'Bị từ chối', error: 'Lỗi', unknown: 'Chưa xác nhận, không tự gửi lại' }[target.status] ?? target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\n' + target.externalLink : ''}`).join('\n');
-    addNotice(state, post.id + ':' + signature, post.chatId, text);
+    const retryable = targets.some(target => !target.retryRequested && (target.status === 'error' && target.postId || target.status === 'rejected' && !target.postId));
+    addNotice(state, post.id + ':' + signature, post.chatId, text, retryable ? post.messageId : undefined);
   };
   const maintain = (state) => {
+    for (const post of state.posts) {
+      if (post.targets?.some(target => !target.retryRequested && (target.status === 'error' && target.postId || target.status === 'rejected' && !target.postId)) && !state.notices.some(notice => notice.retryMessageId === post.messageId && notice.chatId === post.chatId)) {
+        addNotice(state, 'retry-available:' + post.id, post.chatId, `Bài #${post.messageId} có kênh đăng lỗi. Bấm nút bên dưới để khôi phục các kênh lỗi. Bài chưa tới giờ giữ nguyên lịch; bài đã tới giờ mới đăng lại ngay. Bot sẽ kiểm tra trạng thái và ảnh/video trước; kênh đã thành công không được đăng lại.`, post.messageId);
+      }
+    }
     for (const post of state.posts) for (const target of post.targets ?? []) {
-      if (target.status === 'submitting' && now() - target.claimedAt > 600000) {
+      if (['submitting', 'retrying'].includes(target.status) && now() - target.claimedAt > 600000) {
         target.status = 'unknown'; target.error = 'Lần gửi trước bị gián đoạn. Kiểm tra Buffer trước khi gửi lại.'; refresh(state, post);
       }
     }
