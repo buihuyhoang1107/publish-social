@@ -1,40 +1,22 @@
-# Tiếp tục công việc
+﻿# Tiếp tục công việc
 
-## Cập nhật mới nhất 27/10/2026
-
-- User đã kết nối đủ 3 kênh (Free): API xác nhận TikTok thieponline.org, Facebook Page Thiệp online Trọng Hoàng, Threads bhhoang_1107, tất cả isDisconnected=false/isLocked=false. Payload temp/buffer-three-channels-verified.json.
-- Đã thu gọn config.services thành [tiktok,facebook,threads], help Telegram lấy label theo config, không báo thiếu Instagram. Rebuild/import/publish cùng workflow ID và restart n8n; không đăng thử nội dung cũ. Routing check bằng payload thật PASS đúng 3 targets.
-
-- User yêu cầu nhiều ảnh và nhiều nền tảng, đã chọn Facebook Page + Instagram + Threads ngoài TikTok. Workflow live cùng ID đã nâng thành Social Publisher - Telegram Multi Platform.
-- Album <=10 ảnh qua media_group_id: spool từng update, một coordinator, chờ quiet period, giữ thứ tự message_id/caption, tải đủ trước đăng; receipt aliases và khóa từng kênh chống lặp.
-- Fan-out đọc account/channels mỗi bài, gửi đồng thời tới mọi kênh kết nối thuộc services [tiktok,facebook,instagram,threads]. Kênh thiếu/khóa/lỗi báo riêng không chặn kênh khác. /status không tạo lại bài; receipt single TikTok cũ vẫn đọc được.
-- PASS real isolated n8n: album3/10 ảnh, đúng thứ tự, quiet, dedup/alias, tải thiếu không đăng album nửa, 4 publish đồng thời (maxActive=4), lỗi GraphQL/HTTP từng kênh, missing connections, ảnh/video/AI.
-- API live xác nhận mới có TikTok thieponline.org. User phải kết nối Facebook Page, Instagram Professional, Threads tại https://publish.buffer.com/settings/channels một lần; không xin secret. Sau kết nối tự phát hiện, không sửa channelId. Free chỉ3channels nên4channels cần plan phù hợp; chưa mua/đổi plan.
-- Không tự đăng thử lại nội dung cũ lên tài khoản thật khi nâng flow. PASS sau deploy: activeVersionId đúng, whitelist4services/owner, public GET/HEAD byte đúng. PASS legacy status migration không publish; album giao lại sau restart không tạo bài trên bất kỳ kênh nào. Container test đã dọn; không xóa dữ liệu test local.
-
-- FIX sau ảnh chụp user: bot trước đó chỉ nhận video nên đã bỏ qua ảnh+caption (message 53, execution 48). Đã nhận photo/document image, asset image đúng contract, MIME JPG/PNG/WEBP; /status không tham số tự xem bài gần nhất. Không bắt user gửi lại.
-- Đã phục hồi đúng update ảnh 53 trong temp/telegram-recover-photo.json và chạy recovery workflow inactive telegramRecoverPhoto53. Buffer nhận bài ID 6ae05a8f124181c6d9a8531c; receipt downloads/buffer-media/telegram-post-6729441444-53.json. Đang theo dõi sending, tuyệt đối không tạo lại bài.
-- Media webhook hỗ trợ GET + HEAD vì Buffer có HEAD probe. Test runtime đã PASS cả ảnh, MIME, HEAD, latest status và video flow cũ.
-
-- Người dùng muốn chỉ dùng Telegram. Đã nối Telegram -> n8n -> Buffer -> TikTok thieponline.org -> trả kết quả Telegram, không duyệt.
-- Live workflow cùng ID seKtuQgWny3K7y5m đã đổi thành Social Publisher - Telegram TikTok, publish và recreate n8n. Buffer connection workflow giữ inactive.
-- Giữ credential hiện có. Read Buffer account/channels đã chạy thành công. Không import credential trống.
-- Source: workflows/telegram-publisher.json, workflows/code/telegram-publisher-*.js; builder và runtime test trong scripts. Hướng dẫn docs/TELEGRAM_PUBLISHER.md.
-- Local config/deploy/backup trong temp/telegram-publisher-*.json và temp/telegram-config-before.json. Deploy phải gán versionId mới trước import/publish.
-- Owner allowlist từ phiên duyệt cũ; receipt file atomic wx chặn redelivery đồng thời và sau restart. Không retry publish mutation.
-- Runtime test n8n riêng PASS: auth/help/validation/AI/binary/media/publish/poll/status/dedup/errors. Không gửi Telegram hoặc đăng TikTok thật trong test.
-- Đã SENT lúc 15:06 ngày 27/10/2026: ảnh/caption message 53 phục hồi đã đăng TikTok thành công, https://tiktok.com/@thieponline.org/video/7701254909521349908 . Không yêu cầu user gửi lại. Recovery workflow hiện chỉ còn nhánh đọc trạng thái, không chứa mutation publish. /status trên bot tự lấy bài gần nhất.
-- Docker/n8n/tunnel cần tiếp tục chạy. Quick Tunnel đổi URL cần build/import/publish lại. Không git, không xin token trong chat.
-
-## Lịch sử trước khi đổi sang Telegram publisher
-
-- Trạng thái: in_progress
-- Cập nhật: 2026-10-27T14:12:36+07:00
-- Mục tiêu: Buffer+n8n dang TikTok: cho APIkey trong credential
-- File: docs/BUFFER_SETUP.md
-- File: workflows/buffer-publisher.json
-- Đã làm / quyết định: Scope user: dua content/media -> hethongpublish nhieunen tang; hienTikTok; KHONG duyetTelegram. User chonBuffer+n8n; anhBufferxacnhan TikTok thieponline.org connected.
-- Đã làm / quyết định: Da tao n8n credential Buffer API typehttpBearerAuth IDbufferApiMain20261027 tokenrong. Userphai nhapAPIkey truc tiep vao BearerToken (khong prefixBearer). KHONG reimport temp/buffer-credential-empty.json sau khi usernhapkey.
-- Đã làm / quyết định: Da import workflow Social Publisher - Buffer IDsocialBufferPublisher Start->Read Buffer Account; chi GraphQLGetOrganizations theo officialQuickStart, chua publish. Sourceworkflows/buffer-publisher.json khongcredentials; deployedrefcred dattemp. ChuadungappTikTokSandbox/OAuth2.
-- Kiểm tra: PASS JSONparse query va CLIimport credential/workflow; NOT_RUN BufferAPIthat vi chuatoken
-- Bước tiếp theo: User mo https://publish.buffer.com/settings/api taokey. n8n /home/credentials -> Buffer API -> BearerToken -> Save. Workflow http://localhost:5678/workflow/socialBufferPublisher Execute docorgs, checkGraphQLerrors; sau do querychannels va publisher. Khongxinsecretchat,khonggit.
+- Cập nhật: 29/10/2026. Trạng thái: đang chọn kiến trúc phim Telegram.
+- Quy tắc: đọc codex-workflow/README.md; không dùng bất kỳ lệnh Git nào; không tự đăng thử lên kênh thật.
+- Production: n8n workflow seKtuQgWny3K7y5m, Telegram → Buffer; giữ nguyên lịch và queue hiện có.
+- Crop đã triển khai: /crop JPG, /crop png, /crop parts ZIP; /done thoát; link tải dự phòng 24 giờ. Giữ cách chia 3 cột đã được duyệt, không tự bỏ vùng đen.
+- Retry đã sửa: bài tương lai giữ dueAt, chỉ bài quá giờ dùng shareNow. Không hồi quy lỗi đăng sớm.
+- Bản phim cũ trong output/film-pilot-30s chỉ là animatic một ảnh + phụ đề, chưa có giọng/khớp miệng; không coi là phim chuyển động hoàn chỉnh.
+- Yêu cầu mới: gửi lệnh Telegram làm phim hoạt hình có hội thoại, cùng hai nhân vật qua nhiều tập: quen nhau → cưới/thiệp cưới → nhà và con. Hạn chế API trả phí.
+- Đã xác minh phần cứng: RTX 4060 Ti 8188 MiB VRAM, RAM 31.8 GB, 28 CPU threads; ổ D còn khoảng 100 GB.
+- Đã đọc source intake/builder: chế độ phim phải được xử lý trước đường nhận nội dung đăng bài; cần job queue riêng và gửi kết quả về Telegram.
+- Đã đối chiếu upstream: ComfyUI có local API/queue; LTX-Video có hướng lượng tử hóa cho GPU 8 GB; cần benchmark thực tế trước hứa tốc độ/chất lượng.
+- WanGP hỗ trợ model ít VRAM, nhưng license hiện tại có điều kiện khi nhúng vào dịch vụ trả phí. Không mặc định chọn làm nền tảng sản phẩm nhiều người dùng.
+- VieNeu-TTS v3 Turbo có CPU/ONNX, giọng Việt và model card Apache-2.0; chưa tải hoặc kiểm thử tại máy này.
+- User chốt phong cách: 2.5D/cinematic 3D nhẹ cho TikTok/Reels thieponline.org.
+- Đã tạo keyframe mới bằng built-in imagegen: output/wedding-film-25d/scene-01-keyframe.png; prompt nguyên văn trong keyframe-prompt.txt. Đây vẫn là ảnh tĩnh, chưa là chuyển động.
+- Đã viết episode-01.json: Tấm thiệp đầu tiên, 6 cảnh liên tiếp đủ 30s; series từ gặp gỡ đến nhà/con.
+- Source mới: services/film-tools/render_benchmark.py, download_model.py, requirements.txt, README.md; giữ CPU text encoder và GPU video, cache prompt, ghi timing/VRAM. Chưa kiểm thử inference.
+- PASS py_compile hai script; JSON hợp lệ, timeline 30s, keyframe tồn tại. Chưa có MP4 chuyển động/hội thoại/lip-sync.
+- Đã cài uv trong temp/film-bootstrap và Python 3.11 trong tools/python, tạo temp/film-local-venv. Lượt tải torch CUDA 2.6.0 và model LTX 0.9.5 (25.6GB) dừng do tốc độ tải chậm/dung lượng; model còn partial, torch chưa cài xong. Không có tải nền tiếp tục.
+- Model revision ghim e58e28c39631af4d1468ee57a853764e11c1d37e; model Open RAIL-M, giữ license khi dùng/phân phối. Chưa bật /film, chưa thay đổi workflow production.
+- Bước tiếp: hoàn tất môi trường/dependencies và tải model từ cache theo README; chạy cảnh thử để đo/kiểm tra mặt-tay-chuyển động. Sau khi đạt mới tích hợp worker Telegram. Không coi prototype này là công cụ Telegram đã hoàn thành.

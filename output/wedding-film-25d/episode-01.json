@@ -1,0 +1,33 @@
+{
+  "title": "Tấm thiệp đầu tiên",
+  "brand": "thieponline.org",
+  "style": "2.5D cinematic, warm champagne and ivory, muted sage, soft painted textures",
+  "duration_seconds": 30,
+  "status": "preproduction; motion benchmark required; no speech or lip sync yet",
+  "characters": {
+    "Linh": "Vietnamese woman, 27, shoulder-length black hair, ivory blouse, sage cardigan",
+    "Minh": "Vietnamese man, 28, short black hair, pale-blue rolled-sleeve shirt"
+  },
+  "keyframe": "scene-01-keyframe.png",
+  "scenes": [
+    {"id": 1, "start": 0, "end": 5, "action": "Linh nhấc tấm thiệp lên, quay sang Minh.", "speaker": "Linh", "dialogue": "Anh ơi, thiệp cưới mình chọn mẫu nào?"},
+    {"id": 2, "start": 5, "end": 10, "action": "Minh nhìn tấm thiệp, rồi nhìn Linh và mỉm cười.", "speaker": "Minh", "dialogue": "Mẫu nào cũng được, miễn có tên hai đứa mình."},
+    {"id": 3, "start": 10, "end": 15, "action": "Linh bật cười, chỉ vào những tấm thiệp trên bàn.", "speaker": "Linh", "dialogue": "Dễ vậy sao? Em chọn cả buổi rồi đấy!"},
+    {"id": 4, "start": 15, "end": 20, "action": "Minh kéo ghế sát lại, cùng Linh xem mẫu thiệp.", "speaker": "Minh", "dialogue": "Vậy cho anh chọn cùng. Mình làm từng việc một."},
+    {"id": 5, "start": 20, "end": 25, "action": "Hai người cùng đặt tấm thiệp đã chọn xuống bàn.", "speaker": "Linh", "dialogue": "Chốt mẫu này nhé. Nhẹ nhàng, giống chuyện của mình."},
+    {"id": 6, "start": 25, "end": 30, "action": "Hai người nhìn nhau, khẽ gật đầu; khung hình kết ở tấm thiệp.", "speaker": "Minh", "dialogue": "Ừ. Cùng nhau, từ tấm thiệp đến một mái nhà."}
+  ],
+  "series": ["Lần đầu gặp nhau", "Cuộc hẹn đầu", "Giận và hiểu nhau", "Lời cầu hôn", "Tấm thiệp đầu tiên", "Ngày chung đôi", "Ngôi nhà nhỏ", "Nhà có thêm tiếng cười"],
+  "benchmark": {
+    "model": "Lightricks/LTX-Video-0.9.5",
+    "revision": "e58e28c39631af4d1468ee57a853764e11c1d37e",
+    "width": 320,
+    "height": 576,
+    "num_frames": 49,
+    "fps": 24,
+    "steps": 25,
+    "seed": 29102026,
+    "prompt": "A refined cinematic 2.5D animated medium two-shot of an engaged Vietnamese couple in a warm wedding stationery studio. The woman in an ivory blouse and sage cardigan gently lifts an ivory invitation a few centimeters, looks down at it, then turns her eyes toward the man in a pale blue shirt. The man gives a small natural nod and smiles softly at her. Subtle blinking and breathing. Their hands keep a steady natural grip on the same invitation. Warm golden window light, champagne and ivory palette, soft painterly surfaces and dimensional shading. The camera stays fixed, the background stays still, no cuts. Slow restrained character movement, continuous anatomy, consistent faces, elegant adult proportions.",
+    "negative_prompt": "blurry, low quality, jitter, flicker, distorted faces, changing identity, extra fingers, extra limbs, disfigured hands, rapidly moving camera, scene cuts, text, watermark, exaggerated cartoon eyes"
+  }
+}

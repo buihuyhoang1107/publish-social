@@ -1,77 +1,54 @@
 {
   "version": 1,
   "task": {
-    "id": "buffer-tiktok-20261027",
-    "title": "Buffer + n8n dang TikTok, bo duyet Telegram",
-    "goal": "User dua content/media, n8n dang TikTok qua Buffer va tra ket qua",
+    "id": "wedding-film-25d",
+    "title": "Phim cưới 2.5D qua Telegram",
+    "goal": "Kiểm chứng cảnh chuyển động bằng model chạy tại máy trước khi nối Telegram",
     "status": "working",
     "criteria": [
-      "Ket noi Buffer TikTok, credential n8n, publish bai test duoc xac nhan"
+      "Có khung hình nhân vật, cấu hình cảnh và kết quả benchmark thực tế"
     ]
   },
   "roles": {
-    "lead": {
-      "status": "working",
-      "action": "User da chon Buffer+n8n, bo duyetTelegram; huong dan ket noi TikTok trong Buffer",
-      "phase": "analysis",
-      "updated_at": "2026-10-27T14:07:54+07:00",
-      "next": "User tao Buffer va Channels -> Connect TikTok; sau do luu APIkey trong n8n Credentials",
+    "implement": {
+      "status": "planned",
+      "action": "Đã lưu keyframe, kịch bản 30s và script benchmark; chưa chạy inference vì bộ tải GPU/model chưa đầy đủ",
+      "phase": "handoff",
+      "updated_at": "2026-10-29T13:54:46+07:00",
+      "next": "Hoàn tất dependencies/model rồi chạy và review cảnh chuyển động, sau đó mới nối Telegram",
       "files": [
-        "docs/BUFFER_SETUP.md"
+        "services/film-tools/render_benchmark.py",
+        "services/film-tools/download_model.py",
+        "output/wedding-film-25d/episode-01.json"
       ],
       "checks": [
         {
           "status": "PASS",
-          "label": "Da doi chieu official Buffer API QuickStart va TikTok auto publishing"
+          "label": "py_compile hai script; timeline 6 cảnh liên tiếp đủ 30s; keyframe tồn tại"
         },
         {
           "status": "NOT_RUN",
-          "label": "Chua tai khoan/ket noiBuffer/APIkey/channel/media de test"
+          "label": "GPU inference, thoại, lip sync và Telegram chưa kiểm thử"
         }
-      ]
-    },
-    "implement": {
-      "status": "working",
-      "action": "Buffer API that PASS, TikTokchannelverified; dang tao formuploadfile va temporarymedia choBufferfetch",
-      "phase": "implementation",
-      "updated_at": "2026-10-27T14:30:47+07:00",
-      "next": "Test nativeform/media va mockpublish truoc deploy",
-      "files": [
-        "workflows/buffer-publisher.json",
-        "scripts/build-buffer-workflow.cjs"
-      ],
-      "checks": [
-        {
-          "status": "PASS",
-          "label": "APIreadorg/channels: thieponline.org connected unlocked scheduleUpdates"
-        }
-      ],
-      "artifacts": [
-        "http://localhost:5678/workflow/socialBufferPublisher"
       ]
     }
   },
   "events": [
     {
-      "at": "2026-10-27T14:30:47+07:00",
+      "at": "2026-10-29T13:54:46+07:00",
       "role": "implement",
-      "message": "Buffer API that PASS, TikTokchannelverified; dang tao formuploadfile va temporarymedia choBufferfetch"
+      "message": "Đã lưu keyframe, kịch bản 30s và script benchmark; chưa chạy inference vì bộ tải GPU/model chưa đầy đủ"
     },
     {
-      "at": "2026-10-27T14:12:52+07:00",
+      "at": "2026-10-29T13:46:29+07:00",
       "role": "implement",
-      "message": "Da tao BufferAPI credential rong va workflow readonly Start -> Read Buffer Account"
+      "message": "Đã tạo keyframe 2.5D, đang chuẩn bị môi trường GPU riêng"
     },
     {
-      "at": "2026-10-27T14:07:54+07:00",
+      "at": "2026-10-29T13:46:28+07:00",
       "role": "lead",
-      "message": "User da chon Buffer+n8n, bo duyetTelegram; huong dan ket noi TikTok trong Buffer"
-    },
-    {
-      "at": "2026-10-27T14:07:53+07:00",
-      "role": "lead",
-      "message": "Nhiệm vụ: Buffer + n8n dang TikTok, bo duyet Telegram (working)"
+      "message": "Nhiệm vụ: Phim cưới 2.5D qua Telegram (working)"
     }
   ],
-  "updated_at": "2026-10-27T14:30:47+07:00"
+  "updated_at": "2026-10-29T13:54:46+07:00"
 }
