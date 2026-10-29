@@ -33,7 +33,174 @@
         0
       ],
       "parameters": {
-        "jsCode": "const publisherConfig = {\"allowedUserIds\":[6729441444],\"allowedChatIds\":[6729441444],\"channelId\":\"6ae04e2c2f1f5ed648e6e5cc\",\"publicBaseUrl\":\"https://beijing-manchester-shade-genes.trycloudflare.com\",\"services\":[\"tiktok\",\"facebook\",\"threads\"],\"albumQuietMs\":3000,\"queue\":{\"enabled\":true,\"hours\":[9,14,20],\"lowWatermark\":3,\"maxPendingPerChannel\":9},\"mediaWebhookId\":\"72b6fa94-2772-4442-bd42-5b4d07e37206\"};\n// Shared durable queue. All mutations are synchronous under one short filesystem lock.\r\nconst queueStore = (() => {\r\n  const fs = require('fs');\r\n  const crypto = require('crypto');\r\n  const file = '/files/telegram-content-queue.json';\r\n  const lock = file + '.lock';\r\n  const labels = { draft: 'Chờ duyệt', approved: 'Đã duyệt, chờ xếp lịch', scheduling: 'Đang gửi lịch', scheduled: 'Đã lên lịch', partial: 'Một số kênh cần kiểm tra', sent: 'Đã đăng', attention: 'Cần kiểm tra', cancelled: 'Đã hủy' };\r\n  const platforms = { tiktok: 'TikTok', facebook: 'Facebook', threads: 'Threads', instagram: 'Instagram' };\r\n  const now = () => Date.now();\r\n  const read = () => {\r\n    try { return JSON.parse(fs.readFileSync(file, 'utf8')); }\r\n    catch (error) { if (error.code !== 'ENOENT') throw error; return { version: 1, posts: [], commands: {}, notices: [], lowNotified: {} }; }\r\n  };\r\n  const write = (name, value) => {\r\n    const temporary = name + '.' + crypto.randomBytes(8).toString('hex') + '.tmp';\r\n    fs.writeFileSync(temporary, JSON.stringify(value), { mode: 0o600 });\r\n    fs.renameSync(temporary, name);\r\n  };\r\n  const transact = (operation) => {\r\n    let descriptor;\r\n    try { descriptor = fs.openSync(lock, 'wx', 0o600); }\r\n    catch (error) {\r\n      if (error.code !== 'EEXIST') throw error;\r\n      // No transaction contains network calls or awaits. A five-minute lock is abandoned.\r\n      let modifiedAt;\r\n      try { modifiedAt = fs.statSync(lock).mtimeMs; }\r\n      catch (statError) { if (statError.code !== 'ENOENT') throw statError; return { busy: true }; }\r\n      if (now() - modifiedAt > 300000) {\r\n        try { fs.unlinkSync(lock); } catch (cleanupError) { if (cleanupError.code !== 'ENOENT') throw cleanupError; }\r\n      }\r\n      return { busy: true };\r\n    }\r\n    try { const state = read(); const result = operation(state); write(file, state); return result; }\r\n    finally { fs.closeSync(descriptor); fs.unlinkSync(lock); }\r\n  };\r\n  const formatTime = (value) => new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });\r\n  const slots = (timestamp) => {\r\n    const local = new Date(timestamp + 7 * 3600000);\r\n    const midnight = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - 7 * 3600000;\r\n    return publisherConfig.queue.hours.map(hour => midnight + hour * 3600000);\r\n  };\r\n  const nextSlot = (state, chatId, remoteDates = []) => {\r\n    const occupied = new Set([...state.posts.filter(post => post.chatId === chatId && post.dueAt && post.status !== 'cancelled').map(post => post.dueAt), ...remoteDates.filter(Boolean).map(value => new Date(value).toISOString())]);\r\n    for (let day = 0; day < 366; day++) for (const time of slots(now() + day * 86400000)) {\r\n      const value = new Date(time).toISOString();\r\n      if (time > now() + 300000 && !occupied.has(value)) return value;\r\n    }\r\n    throw new Error('Không tìm được khung giờ trống trong một năm tới.');\r\n  };\r\n  const addNotice = (state, id, chatId, text, retryMessageId) => {\r\n    if (!state.notices.some(notice => notice.id === id)) state.notices.push({ id, chatId, text, retryMessageId, status: 'ready' });\r\n  };\r\n  const refresh = (state, post) => {\r\n    if (!post.targets?.length) return;\r\n    const targets = post.targets;\r\n    if (targets.some(target => ['planned', 'submitting', 'retrying'].includes(target.status))) post.status = 'scheduling';\r\n    else if (targets.every(target => target.status === 'sent')) post.status = 'sent';\r\n    else if (targets.some(target => ['sent', 'scheduled', 'sending'].includes(target.status))) post.status = targets.some(target => ['error', 'unknown', 'rejected', 'unavailable', 'skipped'].includes(target.status)) ? 'partial' : 'scheduled';\r\n    else post.status = 'attention';\r\n    if (targets.some(target => ['planned', 'submitting', 'retrying'].includes(target.status))) return;\r\n    const signature = crypto.createHash('sha256').update(JSON.stringify(targets.map(target => [target.channelId, target.status, target.error, target.externalLink]))).digest('hex');\r\n    const sentCount = targets.filter(target => target.status === 'sent').length;\r\n    const heading = sentCount\r\n      ? `✅ Vừa đăng bài #${post.messageId} thành công trên ${sentCount}/${targets.length} kênh.`\r\n      : `Bài #${post.messageId} — ${labels[post.status]}`;\r\n    const text = `${heading}\\nLịch: ${formatTime(post.dueAt)} (giờ Việt Nam)\\n` +\r\n      (sentCount ? `Xác nhận lúc: ${formatTime(now())} (giờ Việt Nam)\\nNội dung: ${Array.from(post.caption).slice(0, 200).join('')}${Array.from(post.caption).length > 200 ? '…' : ''}\\n\\n` : '') +\r\n      targets.map(target => `${platforms[target.service] ?? target.service}${target.channelName ? ' (' + target.channelName + ')' : ''}: ${{ scheduled: 'Đã lên lịch', sending: 'Đang đăng', sent: 'Đã đăng', skipped: 'Bỏ qua', unavailable: 'Chưa sẵn sàng', rejected: 'Bị từ chối', error: 'Lỗi', unknown: 'Chưa xác nhận, không tự gửi lại' }[target.status] ?? target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\\n' + target.externalLink : ''}`).join('\\n');\r\n    const retryable = targets.some(target => !target.retryRequested && (target.status === 'error' && target.postId || target.status === 'rejected' && !target.postId));\r\n    addNotice(state, post.id + ':' + signature, post.chatId, text, retryable ? post.messageId : undefined);\r\n  };\r\n  const maintain = (state) => {\r\n    for (const post of state.posts) {\r\n      if (post.targets?.some(target => !target.retryRequested && (target.status === 'error' && target.postId || target.status === 'rejected' && !target.postId)) && !state.notices.some(notice => notice.retryMessageId === post.messageId && notice.chatId === post.chatId)) {\r\n        addNotice(state, 'retry-available:' + post.id, post.chatId, `Bài #${post.messageId} có kênh đăng lỗi. Bấm nút bên dưới để khôi phục các kênh lỗi. Bài chưa tới giờ giữ nguyên lịch; bài đã tới giờ mới đăng lại ngay. Bot sẽ kiểm tra trạng thái và ảnh/video trước; kênh đã thành công không được đăng lại.`, post.messageId);\r\n      }\r\n    }\r\n    for (const post of state.posts) for (const target of post.targets ?? []) {\r\n      if (['submitting', 'retrying'].includes(target.status) && now() - target.claimedAt > 600000) {\r\n        target.status = 'unknown'; target.error = 'Lần gửi trước bị gián đoạn. Kiểm tra Buffer trước khi gửi lại.'; refresh(state, post);\r\n      }\r\n    }\r\n    for (const chatId of publisherConfig.allowedChatIds) {\r\n      const posts = state.posts.filter(post => post.chatId === chatId);\r\n      const available = posts.filter(post => post.status === 'approved' || (post.dueAt && Date.parse(post.dueAt) > now() && ['scheduling', 'scheduled', 'partial'].includes(post.status))).length;\r\n      if (available > publisherConfig.queue.lowWatermark) state.lowNotified[chatId] = false;\r\n      else if (!state.lowNotified[chatId] && posts.some(post => post.approvedAt)) {\r\n        addNotice(state, 'low:' + chatId + ':' + now(), chatId, `Kho sắp hết: còn ${available} bài đã duyệt/đã lên lịch cho các khung giờ tới. Gửi thêm bài để tự động duyệt và xếp lịch; dùng /queue để xem.`);\r\n        state.lowNotified[chatId] = true;\r\n      }\r\n      for (const time of slots(now())) if (now() >= time && now() - time < 300000 && !posts.some(post => post.dueAt === new Date(time).toISOString() && post.status !== 'cancelled')) {\r\n        addNotice(state, 'empty:' + chatId + ':' + time, chatId, `Bỏ qua khung ${formatTime(time)}: không có bài đã được duyệt và xếp lịch. Bot không tự tạo hoặc đăng lại nội dung cũ. Gửi thêm bài để tự động duyệt và xếp lịch.`);\r\n      }\r\n    }\r\n  };\r\n  return { fs, crypto, read, write, transact, labels, platforms, now, formatTime, nextSlot, addNotice, refresh, maintain };\r\n})();\r\n\nconst fs = require('fs');\r\nconst crypto = require('crypto');\r\nconst update = $input.first().json;\r\nconst callback = update.callback_query;\r\nconst message = callback ? { ...callback.message, from: callback.from, text: '' } : update.message;\r\nif (!message || message.chat?.type !== 'private' || !publisherConfig.allowedUserIds.includes(message.from?.id) || !publisherConfig.allowedChatIds.includes(message.chat.id)) return [];\r\nconst context = { chatId: message.chat.id, messageId: message.message_id, shouldPublish: false, queryStatus: false, isAlbum: false };\r\nconst reply = (text) => [{ json: { ...context, text } }];\r\nif (callback) {\r\n  const match = /^queue_retry:(\\d+)$/.exec(callback.data ?? '');\r\n  if (!publisherConfig.queue?.enabled || !match) return [];\r\n  return [{ json: { ...context, queueCommand: true, commandText: '/retry ' + match[1], commandKey: 'callback:' + callback.id, callbackQueryId: callback.id } }];\r\n}\r\nconst command = (message.text ?? '').split(/\\s/, 1)[0].split('@', 1)[0];\r\nconst platformLabels = { tiktok: 'TikTok', facebook: 'Facebook Page', instagram: 'Instagram', threads: 'Threads' };\r\nconst help = publisherConfig.queue?.enabled ? `Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bài gửi vào được tự động duyệt và xếp lịch, không cần /approve.\\n/queue — xem kho và lịch\\n/cancel <mã bài> — hủy bài chưa gửi Buffer\\n/status — xem bài gần nhất\\nLịch: 09:00, 14:00, 20:00 hằng ngày (giờ Việt Nam), lên các kênh ${publisherConfig.services.map(service => platformLabels[service]).join(', ')} đã kết nối.\\nNhập album một lần, tối đa 10 ảnh. Mỗi file tối đa 20 MB. /ai ở đầu caption cho video AI. Threads tối đa 499 ký tự; bài dài sẽ bỏ qua kênh này.\\nMáy, Docker và tunnel phải chạy đến khi các bài đăng xong để Buffer lấy media.` : `Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tự gửi đăng lên ${publisherConfig.services.map((service) => platformLabels[service]).join(', ')} đã kết nối. Không cần duyệt.\\nVới nhiều ảnh: chọn các ảnh và gửi chung thành một album, nhập caption một lần. Mỗi file tối đa 20 MB.\\nVideo AI: thêm /ai ở đầu caption.\\nGửi /status để xem kết quả từng nền tảng của bài gần nhất.`;\r\nif (publisherConfig.queue?.enabled && ['/queue', '/approve', '/cancel', '/retry'].includes(command)) return [{ json: { ...context, queueCommand: true, commandText: (message.text ?? '').replace(/^\\/\\w+(?:@\\w+)?/, command), replyMessageId: message.reply_to_message?.message_id } }];\r\nif (command === '/status') {\r\n  let target = message.reply_to_message?.message_id ?? Number((message.text ?? '').split(/\\s+/)[1]);\r\n  if (!Number.isSafeInteger(target) || target <= 0) {\r\n    target = 0;\r\n    const prefix = `telegram-post-${context.chatId}-`;\r\n    for (const file of fs.readdirSync('/files')) {\r\n      if (!file.startsWith(prefix) || !file.endsWith('.json')) continue;\r\n      const id = Number(file.slice(prefix.length, -5));\r\n      if (Number.isSafeInteger(id) && id > target) target = id;\r\n    }\r\n  }\r\n  if (!target) return reply('Chưa có yêu cầu đăng nào được ghi nhận.');\r\n  let journalFile = `/files/telegram-post-${context.chatId}-${target}.json`;\r\n  let saved;\r\n  try {\r\n    saved = JSON.parse(fs.readFileSync(journalFile, 'utf8'));\r\n    if (saved.canonicalFile) {\r\n      journalFile = saved.canonicalFile;\r\n      saved = JSON.parse(fs.readFileSync(journalFile, 'utf8'));\r\n    }\r\n  } catch (error) {\r\n    if (error.code !== 'ENOENT') throw error;\r\n    return reply('Chưa có yêu cầu đăng cho tin nhắn này.');\r\n  }\r\n  if (publisherConfig.queue?.enabled && saved.queuePostId) {\r\n    const post = queueStore.read().posts.find(item => item.id === saved.queuePostId && item.chatId === context.chatId);\r\n    if (post?.targets?.some(target => !target.retryRequested && (target.status === 'error' && target.postId || target.status === 'rejected' && !target.postId))) context.retryMessageId = post.messageId;\r\n    if (post) return reply(`Bài #${post.messageId} — ${queueStore.labels[post.status]}${post.dueAt ? '\\nLịch: ' + queueStore.formatTime(post.dueAt) + ' (giờ Việt Nam)' : ''}\\n${post.caption.slice(0, 800)}\\n` + (post.targets ?? []).map(target => `${queueStore.platforms[target.service] ?? target.service}: ${target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\\n' + target.externalLink : ''}`).join('\\n'));\r\n  }\r\n  if (!saved.targets?.length && !saved.postId) return reply(saved.text ?? 'Bài đang được chuẩn bị, chưa có kết quả đăng.');\r\n  return [{ json: { ...context, messageId: saved.messageId, journalFile, queryStatus: true } }];\r\n}\r\nif (command.startsWith('/')) return reply(help);\r\nconst photo = message.photo?.[message.photo.length - 1];\r\nconst file = photo ?? message.video ?? message.document;\r\nif (!file) return reply('Bài chưa có ảnh/video. Bạn có thể gửi một ảnh, album ảnh hoặc video có caption.');\r\nconst mediaType = photo || file.mime_type?.startsWith('image/') ? 'image' : 'video';\r\nconst extension = photo ? 'jpg' : (file.file_name?.split('.').pop() ?? (file.mime_type === 'video/mp4' ? 'mp4' : '')).toLowerCase();\r\nconst caption = (message.caption ?? '').replace(/^\\/ai(?:\\s|$)/i, '').trim();\r\nconst medium = { messageId: message.message_id, fileId: file.file_id, mediaType, extension, caption, isAiGenerated: /^\\/ai(?:\\s|$)/i.test(message.caption ?? '') };\r\nif (!(mediaType === 'image' ? ['jpg', 'jpeg', 'png', 'webp'] : ['mp4', 'mov', 'webm']).includes(extension)) medium.error = 'Định dạng file chưa hỗ trợ. Ảnh: JPG, PNG, WEBP; video: MP4, MOV, WEBM.';\r\nif (file.file_size > 20 * 1024 * 1024) medium.error = 'Có file vượt giới hạn tải 20 MB của Telegram Bot.';\r\nconst receiptPath = (id) => `/files/telegram-post-${context.chatId}-${id}.json`;\r\nif (message.media_group_id) {\r\n  const albumKey = crypto.createHash('sha256').update(`${context.chatId}:${message.media_group_id}`).digest('hex');\r\n  const albumPrefix = `telegram-album-${albumKey}`;\r\n  const claimFile = `/files/${albumPrefix}.claim.json`;\r\n  let claim;\r\n  try { claim = JSON.parse(fs.readFileSync(claimFile, 'utf8')); }\r\n  catch (error) { if (error.code !== 'ENOENT') throw error; }\r\n  const partFile = `/files/${albumPrefix}-${message.message_id}.part.json`;\r\n  // Redelivery must not extend the quiet period or create another coordinator.\r\n  if (fs.existsSync(partFile)) return [];\r\n  if (claim && fs.existsSync(`/files/${albumPrefix}.sealed`)) return reply('Ảnh này đến sau khi album đã được gửi xử lý nên chưa được thêm vào bài. Những ảnh đã gửi đăng không bị đăng lại.');\r\n  try { fs.writeFileSync(partFile, JSON.stringify({ ...medium, receivedAt: Date.now() }), { flag: 'wx', mode: 0o600 }); }\r\n  catch (error) { if (error.code === 'EEXIST') return []; throw error; }\r\n  let coordinator = false;\r\n  try {\r\n    claim = { chatId: context.chatId, messageId: context.messageId, journalFile: receiptPath(context.messageId), albumPrefix };\r\n    fs.writeFileSync(claimFile, JSON.stringify(claim), { flag: 'wx', mode: 0o600 });\r\n    coordinator = true;\r\n  } catch (error) {\r\n    if (error.code !== 'EEXIST') throw error;\r\n    claim = JSON.parse(fs.readFileSync(claimFile, 'utf8'));\r\n  }\r\n  if (!coordinator) {\r\n    try { fs.writeFileSync(receiptPath(context.messageId), JSON.stringify({ canonicalFile: claim.journalFile }), { flag: 'wx', mode: 0o600 }); }\r\n    catch (error) { if (error.code !== 'EEXIST') throw error; }\r\n    return [];\r\n  }\r\n  fs.writeFileSync(claim.journalFile, JSON.stringify({ ...claim, status: 'collecting', createdAt: new Date().toISOString(), text: 'Đang gom các ảnh trong album thành một bài.' }), { flag: 'wx', mode: 0o600 });\r\n  return [{ json: { ...context, ...claim, isAlbum: true } }];\r\n}\r\nif (medium.error) return reply(medium.error + ' Bài chưa được đăng.');\r\nif (!caption) return reply('Ảnh/video này chưa có caption nên chưa được đăng.');\r\nconst journalFile = receiptPath(context.messageId);\r\ntry { fs.writeFileSync(journalFile, JSON.stringify({ ...context, status: 'received', createdAt: new Date().toISOString(), text: 'Đã nhận bài, đang chuẩn bị đăng.' }), { flag: 'wx', mode: 0o600 }); }\r\ncatch (error) { if (error.code === 'EEXIST') return []; throw error; }\r\nreturn [{ json: { ...context, journalFile, caption, isAiGenerated: medium.isAiGenerated, media: [medium], shouldPublish: true } }];\r\n"
+        "jsCode": "const publisherConfig = {\"allowedUserIds\":[6729441444],\"allowedChatIds\":[6729441444],\"channelId\":\"6ae04e2c2f1f5ed648e6e5cc\",\"publicBaseUrl\":\"https://beijing-manchester-shade-genes.trycloudflare.com\",\"services\":[\"tiktok\",\"facebook\",\"threads\"],\"albumQuietMs\":3000,\"queue\":{\"enabled\":true,\"hours\":[9,14,20],\"lowWatermark\":3,\"maxPendingPerChannel\":9},\"mediaWebhookId\":\"72b6fa94-2772-4442-bd42-5b4d07e37206\"};\n// Shared durable queue. All mutations are synchronous under one short filesystem lock.\r\nconst queueStore = (() => {\r\n  const fs = require('fs');\r\n  const crypto = require('crypto');\r\n  const file = '/files/telegram-content-queue.json';\r\n  const lock = file + '.lock';\r\n  const labels = { draft: 'Chờ duyệt', approved: 'Đã duyệt, chờ xếp lịch', scheduling: 'Đang gửi lịch', scheduled: 'Đã lên lịch', partial: 'Một số kênh cần kiểm tra', sent: 'Đã đăng', attention: 'Cần kiểm tra', cancelled: 'Đã hủy' };\r\n  const platforms = { tiktok: 'TikTok', facebook: 'Facebook', threads: 'Threads', instagram: 'Instagram' };\r\n  const now = () => Date.now();\r\n  const read = () => {\r\n    try { return JSON.parse(fs.readFileSync(file, 'utf8')); }\r\n    catch (error) { if (error.code !== 'ENOENT') throw error; return { version: 1, posts: [], commands: {}, notices: [], lowNotified: {} }; }\r\n  };\r\n  const write = (name, value) => {\r\n    const temporary = name + '.' + crypto.randomBytes(8).toString('hex') + '.tmp';\r\n    fs.writeFileSync(temporary, JSON.stringify(value), { mode: 0o600 });\r\n    fs.renameSync(temporary, name);\r\n  };\r\n  const transact = (operation) => {\r\n    let descriptor;\r\n    try { descriptor = fs.openSync(lock, 'wx', 0o600); }\r\n    catch (error) {\r\n      if (error.code !== 'EEXIST') throw error;\r\n      // No transaction contains network calls or awaits. A five-minute lock is abandoned.\r\n      let modifiedAt;\r\n      try { modifiedAt = fs.statSync(lock).mtimeMs; }\r\n      catch (statError) { if (statError.code !== 'ENOENT') throw statError; return { busy: true }; }\r\n      if (now() - modifiedAt > 300000) {\r\n        try { fs.unlinkSync(lock); } catch (cleanupError) { if (cleanupError.code !== 'ENOENT') throw cleanupError; }\r\n      }\r\n      return { busy: true };\r\n    }\r\n    try { const state = read(); const result = operation(state); write(file, state); return result; }\r\n    finally { fs.closeSync(descriptor); fs.unlinkSync(lock); }\r\n  };\r\n  const formatTime = (value) => new Date(value).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour12: false });\r\n  const slots = (timestamp) => {\r\n    const local = new Date(timestamp + 7 * 3600000);\r\n    const midnight = Date.UTC(local.getUTCFullYear(), local.getUTCMonth(), local.getUTCDate()) - 7 * 3600000;\r\n    return publisherConfig.queue.hours.map(hour => midnight + hour * 3600000);\r\n  };\r\n  const nextSlot = (state, chatId, remoteDates = []) => {\r\n    const occupied = new Set([...state.posts.filter(post => post.chatId === chatId && post.dueAt && post.status !== 'cancelled').map(post => post.dueAt), ...remoteDates.filter(Boolean).map(value => new Date(value).toISOString())]);\r\n    for (let day = 0; day < 366; day++) for (const time of slots(now() + day * 86400000)) {\r\n      const value = new Date(time).toISOString();\r\n      if (time > now() + 300000 && !occupied.has(value)) return value;\r\n    }\r\n    throw new Error('Không tìm được khung giờ trống trong một năm tới.');\r\n  };\r\n  const addNotice = (state, id, chatId, text, retryMessageId) => {\r\n    if (!state.notices.some(notice => notice.id === id)) state.notices.push({ id, chatId, text, retryMessageId, status: 'ready' });\r\n  };\r\n  const refresh = (state, post) => {\r\n    if (!post.targets?.length) return;\r\n    const targets = post.targets;\r\n    if (targets.some(target => ['planned', 'submitting', 'retrying'].includes(target.status))) post.status = 'scheduling';\r\n    else if (targets.every(target => target.status === 'sent')) post.status = 'sent';\r\n    else if (targets.some(target => ['sent', 'scheduled', 'sending'].includes(target.status))) post.status = targets.some(target => ['error', 'unknown', 'rejected', 'unavailable', 'skipped'].includes(target.status)) ? 'partial' : 'scheduled';\r\n    else post.status = 'attention';\r\n    if (targets.some(target => ['planned', 'submitting', 'retrying'].includes(target.status))) return;\r\n    const signature = crypto.createHash('sha256').update(JSON.stringify(targets.map(target => [target.channelId, target.status, target.error, target.externalLink]))).digest('hex');\r\n    const sentCount = targets.filter(target => target.status === 'sent').length;\r\n    const heading = sentCount\r\n      ? `✅ Vừa đăng bài #${post.messageId} thành công trên ${sentCount}/${targets.length} kênh.`\r\n      : `Bài #${post.messageId} — ${labels[post.status]}`;\r\n    const text = `${heading}\\nLịch: ${formatTime(post.dueAt)} (giờ Việt Nam)\\n` +\r\n      (sentCount ? `Xác nhận lúc: ${formatTime(now())} (giờ Việt Nam)\\nNội dung: ${Array.from(post.caption).slice(0, 200).join('')}${Array.from(post.caption).length > 200 ? '…' : ''}\\n\\n` : '') +\r\n      targets.map(target => `${platforms[target.service] ?? target.service}${target.channelName ? ' (' + target.channelName + ')' : ''}: ${{ scheduled: 'Đã lên lịch', sending: 'Đang đăng', sent: 'Đã đăng', skipped: 'Bỏ qua', unavailable: 'Chưa sẵn sàng', rejected: 'Bị từ chối', error: 'Lỗi', unknown: 'Chưa xác nhận, không tự gửi lại' }[target.status] ?? target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\\n' + target.externalLink : ''}`).join('\\n');\r\n    const retryable = targets.some(target => !target.retryRequested && (target.status === 'error' && target.postId || target.status === 'rejected' && !target.postId));\r\n    addNotice(state, post.id + ':' + signature, post.chatId, text, retryable ? post.messageId : undefined);\r\n  };\r\n  const maintain = (state) => {\r\n    for (const post of state.posts) {\r\n      if (post.targets?.some(target => !target.retryRequested && (target.status === 'error' && target.postId || target.status === 'rejected' && !target.postId)) && !state.notices.some(notice => notice.retryMessageId === post.messageId && notice.chatId === post.chatId)) {\r\n        addNotice(state, 'retry-available:' + post.id, post.chatId, `Bài #${post.messageId} có kênh đăng lỗi. Bấm nút bên dưới để khôi phục các kênh lỗi. Bài chưa tới giờ giữ nguyên lịch; bài đã tới giờ mới đăng lại ngay. Bot sẽ kiểm tra trạng thái và ảnh/video trước; kênh đã thành công không được đăng lại.`, post.messageId);\r\n      }\r\n    }\r\n    for (const post of state.posts) for (const target of post.targets ?? []) {\r\n      if (['submitting', 'retrying'].includes(target.status) && now() - target.claimedAt > 600000) {\r\n        target.status = 'unknown'; target.error = 'Lần gửi trước bị gián đoạn. Kiểm tra Buffer trước khi gửi lại.'; refresh(state, post);\r\n      }\r\n    }\r\n    for (const chatId of publisherConfig.allowedChatIds) {\r\n      const posts = state.posts.filter(post => post.chatId === chatId);\r\n      const available = posts.filter(post => post.status === 'approved' || (post.dueAt && Date.parse(post.dueAt) > now() && ['scheduling', 'scheduled', 'partial'].includes(post.status))).length;\r\n      if (available > publisherConfig.queue.lowWatermark) state.lowNotified[chatId] = false;\r\n      else if (!state.lowNotified[chatId] && posts.some(post => post.approvedAt)) {\r\n        addNotice(state, 'low:' + chatId + ':' + now(), chatId, `Kho sắp hết: còn ${available} bài đã duyệt/đã lên lịch cho các khung giờ tới. Gửi thêm bài để tự động duyệt và xếp lịch; dùng /queue để xem.`);\r\n        state.lowNotified[chatId] = true;\r\n      }\r\n      for (const time of slots(now())) if (now() >= time && now() - time < 300000 && !posts.some(post => post.dueAt === new Date(time).toISOString() && post.status !== 'cancelled')) {\r\n        addNotice(state, 'empty:' + chatId + ':' + time, chatId, `Bỏ qua khung ${formatTime(time)}: không có bài đã được duyệt và xếp lịch. Bot không tự tạo hoặc đăng lại nội dung cũ. Gửi thêm bài để tự động duyệt và xếp lịch.`);\r\n      }\r\n    }\r\n  };\r\n  return { fs, crypto, read, write, transact, labels, platforms, now, formatTime, nextSlot, addNotice, refresh, maintain };\r\n})();\r\n\nconst handleCropMessage = (message, context) => {\n  const directive = (message.text ?? message.caption ?? '').split(/\\s/, 1)[0].split('@', 1)[0];\n  const selectedOutput = (message.text ?? message.caption ?? '').split(/\\s+/)[1];\n  const partsRequested = selectedOutput === 'parts';\n  const key = context.chatId + ':' + message.from.id;\n  const reply = text => [{ json: { ...context, text } }];\n  if (directive === '/crop' || directive === '/done') {\n    const result = queueStore.transact(state => {\n      state.cropSessions ??= {};\n      if (directive === '/crop') state.cropSessions[key] = partsRequested ? 'parts' : selectedOutput === 'png' ? 'png' : 'collage';\n      else delete state.cropSessions[key];\n      return { updated: true };\n    });\n    if (result.busy) return reply('Bot đang cập nhật dữ liệu. Gửi lại lệnh sau ít giây.');\n    if (directive === '/done') return reply('Đã thoát chế độ cắt ảnh. Ảnh/video gửi tiếp theo sẽ được xử lý theo luồng đăng bài như trước.');\n    if (!message.photo && !message.document) return reply(partsRequested\n      ? '✂️ Gửi ảnh dài dạng File/Tài liệu. Bot trả file ZIP chứa 3 phần PNG ở kích thước gốc, không thu nhỏ.\\n/crop — ảnh ghép JPG dễ tải.\\n/crop png — ảnh ghép PNG.\\n/done — thoát chế độ cắt ảnh.'\n      : `✂️ Đã bật chế độ cắt ảnh ${selectedOutput === 'png' ? 'PNG' : 'JPG chất lượng cao, dung lượng gọn hơn'}. Gửi ảnh dài dạng File/Tài liệu để giữ nét.\\nKhông gửi dưới dạng Ảnh vì Telegram có thể thu nhỏ ảnh dài rất mạnh. JPG, PNG, WEBP; tối đa 20 MB và 40 triệu pixel.\\n/crop png — ảnh ghép PNG.\\n/crop parts — ZIP chứa 3 phần PNG ở kích thước gốc, không thu nhỏ.\\nẢnh trong chế độ này chỉ được cắt và trả lại, không được lên lịch đăng.\\n/done — thoát chế độ cắt ảnh.`);\n  }\n  if (!queueStore.read().cropSessions?.[key]) return;\n  // Other commands may still be used. Media always stays in the crop branch until /done.\n  if (directive.startsWith('/') && directive !== '/crop' && message.text) return;\n  if (message.photo) {\n    const compressed = message.photo[message.photo.length - 1];\n    return reply(`Telegram đang gửi bản Ảnh${compressed.width && compressed.height ? ' ' + compressed.width + ' × ' + compressed.height + 'px' : ''}, có thể đã mất nét. Hãy gửi lại ảnh gốc bằng nút đính kèm → File/Tài liệu, hoặc bỏ chọn Nén ảnh/Compress. Bot cần file gốc để cắt rõ chữ. /done để thoát.`);\n  }\n  if (message.media_group_id) {\n    const album = crypto.createHash('sha256').update(key + ':' + message.media_group_id).digest('hex');\n    try { fs.writeFileSync('/files/telegram-crop-album-' + album + '.json', '{}', { flag: 'wx', mode: 0o600 }); }\n    catch (error) { if (error.code === 'EEXIST') return []; throw error; }\n    return reply('Chế độ cắt ảnh nhận một ảnh dài mỗi lần. Hãy gửi từng ảnh riêng dạng File/Tài liệu, thay vì gửi album. /done để thoát.');\n  }\n  const image = message.photo?.[message.photo.length - 1] ?? message.document;\n  if (!image || message.video || message.document && !message.document.mime_type?.startsWith('image/') && !/\\.(jpe?g|png|webp)$/i.test(message.document.file_name ?? '')) return reply('Đang ở chế độ cắt ảnh. Hãy gửi một ảnh JPG/PNG/WEBP dài theo chiều dọc. /done để quay lại đăng bài.');\n  if (image.file_size > 20 * 1024 * 1024) return reply('Ảnh vượt giới hạn tải 20 MB. Hãy giảm dung lượng và gửi lại. /done để thoát.');\n  const cropReceiptFile = `/files/telegram-crop-${context.chatId}-${context.messageId}.json`;\n  try { fs.writeFileSync(cropReceiptFile, JSON.stringify({ status: 'processing', createdAt: new Date().toISOString() }), { flag: 'wx', mode: 0o600 }); }\n  catch (error) { if (error.code === 'EEXIST') return []; throw error; }\n  const output = queueStore.read().cropSessions[key];\n  const cropSourceName = (message.document.file_name ?? 'anh').replace(/\\\\/g, '/').split('/').pop().replace(/\\.[^.]+$/, '').replace(/[^\\p{L}\\p{N}_.-]/gu, '-').slice(0, 64);\n  return [{ json: { ...context, isCropRequest: true, fileId: image.file_id, cropReceiptFile, cropSourceName, cropOutput: ['parts', 'png'].includes(output) ? output : 'collage' } }];\n};\n\nconst fs = require('fs');\r\nconst crypto = require('crypto');\r\nconst update = $input.first().json;\r\nconst callback = update.callback_query;\r\nconst message = callback ? { ...callback.message, from: callback.from, text: '' } : update.message;\r\nif (!message || message.chat?.type !== 'private' || !publisherConfig.allowedUserIds.includes(message.from?.id) || !publisherConfig.allowedChatIds.includes(message.chat.id)) return [];\r\nconst context = { chatId: message.chat.id, messageId: message.message_id, shouldPublish: false, queryStatus: false, isAlbum: false };\r\nconst reply = (text) => [{ json: { ...context, text } }];\r\nif (callback) {\r\n  const match = /^queue_retry:(\\d+)$/.exec(callback.data ?? '');\r\n  if (!publisherConfig.queue?.enabled || !match) return [];\r\n  return [{ json: { ...context, queueCommand: true, commandText: '/retry ' + match[1], commandKey: 'callback:' + callback.id, callbackQueryId: callback.id } }];\r\n}\r\nconst command = (message.text ?? '').split(/\\s/, 1)[0].split('@', 1)[0];\r\nconst cropResult = handleCropMessage(message, context);\r\nif (cropResult) return cropResult;\r\nconst platformLabels = { tiktok: 'TikTok', facebook: 'Facebook Page', instagram: 'Instagram', threads: 'Threads' };\r\nconst help = publisherConfig.queue?.enabled ? `Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bài gửi vào được tự động duyệt và xếp lịch, không cần /approve.\\n/queue — xem kho và lịch\\n/cancel <mã bài> — hủy bài chưa gửi Buffer\\n/status — xem bài gần nhất\\nLịch: 09:00, 14:00, 20:00 hằng ngày (giờ Việt Nam), lên các kênh ${publisherConfig.services.map(service => platformLabels[service]).join(', ')} đã kết nối.\\nNhập album một lần, tối đa 10 ảnh. Mỗi file tối đa 20 MB. /ai ở đầu caption cho video AI. Threads tối đa 499 ký tự; bài dài sẽ bỏ qua kênh này.\\nMáy, Docker và tunnel phải chạy đến khi các bài đăng xong để Buffer lấy media.` : `Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tự gửi đăng lên ${publisherConfig.services.map((service) => platformLabels[service]).join(', ')} đã kết nối. Không cần duyệt.\\nVới nhiều ảnh: chọn các ảnh và gửi chung thành một album, nhập caption một lần. Mỗi file tối đa 20 MB.\\nVideo AI: thêm /ai ở đầu caption.\\nGửi /status để xem kết quả từng nền tảng của bài gần nhất.`;\r\nif (publisherConfig.queue?.enabled && ['/queue', '/approve', '/cancel', '/retry'].includes(command)) return [{ json: { ...context, queueCommand: true, commandText: (message.text ?? '').replace(/^\\/\\w+(?:@\\w+)?/, command), replyMessageId: message.reply_to_message?.message_id } }];\r\nif (command === '/status') {\r\n  let target = message.reply_to_message?.message_id ?? Number((message.text ?? '').split(/\\s+/)[1]);\r\n  if (!Number.isSafeInteger(target) || target <= 0) {\r\n    target = 0;\r\n    const prefix = `telegram-post-${context.chatId}-`;\r\n    for (const file of fs.readdirSync('/files')) {\r\n      if (!file.startsWith(prefix) || !file.endsWith('.json')) continue;\r\n      const id = Number(file.slice(prefix.length, -5));\r\n      if (Number.isSafeInteger(id) && id > target) target = id;\r\n    }\r\n  }\r\n  if (!target) return reply('Chưa có yêu cầu đăng nào được ghi nhận.');\r\n  let journalFile = `/files/telegram-post-${context.chatId}-${target}.json`;\r\n  let saved;\r\n  try {\r\n    saved = JSON.parse(fs.readFileSync(journalFile, 'utf8'));\r\n    if (saved.canonicalFile) {\r\n      journalFile = saved.canonicalFile;\r\n      saved = JSON.parse(fs.readFileSync(journalFile, 'utf8'));\r\n    }\r\n  } catch (error) {\r\n    if (error.code !== 'ENOENT') throw error;\r\n    return reply('Chưa có yêu cầu đăng cho tin nhắn này.');\r\n  }\r\n  if (publisherConfig.queue?.enabled && saved.queuePostId) {\r\n    const post = queueStore.read().posts.find(item => item.id === saved.queuePostId && item.chatId === context.chatId);\r\n    if (post?.targets?.some(target => !target.retryRequested && (target.status === 'error' && target.postId || target.status === 'rejected' && !target.postId))) context.retryMessageId = post.messageId;\r\n    if (post) return reply(`Bài #${post.messageId} — ${queueStore.labels[post.status]}${post.dueAt ? '\\nLịch: ' + queueStore.formatTime(post.dueAt) + ' (giờ Việt Nam)' : ''}\\n${post.caption.slice(0, 800)}\\n` + (post.targets ?? []).map(target => `${queueStore.platforms[target.service] ?? target.service}: ${target.status}${target.error ? ' — ' + target.error : ''}${target.externalLink ? '\\n' + target.externalLink : ''}`).join('\\n'));\r\n  }\r\n  if (!saved.targets?.length && !saved.postId) return reply(saved.text ?? 'Bài đang được chuẩn bị, chưa có kết quả đăng.');\r\n  return [{ json: { ...context, messageId: saved.messageId, journalFile, queryStatus: true } }];\r\n}\r\nif (command.startsWith('/')) return reply(help + '\\n\\n✂️ /crop — bật chế độ cắt ảnh dài thành 3 cột có viền trắng và nền mờ.\\n/done — thoát chế độ cắt ảnh.');\r\nconst photo = message.photo?.[message.photo.length - 1];\r\nconst file = photo ?? message.video ?? message.document;\r\nif (!file) return reply('Bài chưa có ảnh/video. Bạn có thể gửi một ảnh, album ảnh hoặc video có caption.');\r\nconst mediaType = photo || file.mime_type?.startsWith('image/') ? 'image' : 'video';\r\nconst extension = photo ? 'jpg' : (file.file_name?.split('.').pop() ?? (file.mime_type === 'video/mp4' ? 'mp4' : '')).toLowerCase();\r\nconst caption = (message.caption ?? '').replace(/^\\/ai(?:\\s|$)/i, '').trim();\r\nconst medium = { messageId: message.message_id, fileId: file.file_id, mediaType, extension, caption, isAiGenerated: /^\\/ai(?:\\s|$)/i.test(message.caption ?? '') };\r\nif (!(mediaType === 'image' ? ['jpg', 'jpeg', 'png', 'webp'] : ['mp4', 'mov', 'webm']).includes(extension)) medium.error = 'Định dạng file chưa hỗ trợ. Ảnh: JPG, PNG, WEBP; video: MP4, MOV, WEBM.';\r\nif (file.file_size > 20 * 1024 * 1024) medium.error = 'Có file vượt giới hạn tải 20 MB của Telegram Bot.';\r\nconst receiptPath = (id) => `/files/telegram-post-${context.chatId}-${id}.json`;\r\nif (message.media_group_id) {\r\n  const albumKey = crypto.createHash('sha256').update(`${context.chatId}:${message.media_group_id}`).digest('hex');\r\n  const albumPrefix = `telegram-album-${albumKey}`;\r\n  const claimFile = `/files/${albumPrefix}.claim.json`;\r\n  let claim;\r\n  try { claim = JSON.parse(fs.readFileSync(claimFile, 'utf8')); }\r\n  catch (error) { if (error.code !== 'ENOENT') throw error; }\r\n  const partFile = `/files/${albumPrefix}-${message.message_id}.part.json`;\r\n  // Redelivery must not extend the quiet period or create another coordinator.\r\n  if (fs.existsSync(partFile)) return [];\r\n  if (claim && fs.existsSync(`/files/${albumPrefix}.sealed`)) return reply('Ảnh này đến sau khi album đã được gửi xử lý nên chưa được thêm vào bài. Những ảnh đã gửi đăng không bị đăng lại.');\r\n  try { fs.writeFileSync(partFile, JSON.stringify({ ...medium, receivedAt: Date.now() }), { flag: 'wx', mode: 0o600 }); }\r\n  catch (error) { if (error.code === 'EEXIST') return []; throw error; }\r\n  let coordinator = false;\r\n  try {\r\n    claim = { chatId: context.chatId, messageId: context.messageId, journalFile: receiptPath(context.messageId), albumPrefix };\r\n    fs.writeFileSync(claimFile, JSON.stringify(claim), { flag: 'wx', mode: 0o600 });\r\n    coordinator = true;\r\n  } catch (error) {\r\n    if (error.code !== 'EEXIST') throw error;\r\n    claim = JSON.parse(fs.readFileSync(claimFile, 'utf8'));\r\n  }\r\n  if (!coordinator) {\r\n    try { fs.writeFileSync(receiptPath(context.messageId), JSON.stringify({ canonicalFile: claim.journalFile }), { flag: 'wx', mode: 0o600 }); }\r\n    catch (error) { if (error.code !== 'EEXIST') throw error; }\r\n    return [];\r\n  }\r\n  fs.writeFileSync(claim.journalFile, JSON.stringify({ ...claim, status: 'collecting', createdAt: new Date().toISOString(), text: 'Đang gom các ảnh trong album thành một bài.' }), { flag: 'wx', mode: 0o600 });\r\n  return [{ json: { ...context, ...claim, isAlbum: true } }];\r\n}\r\nif (medium.error) return reply(medium.error + ' Bài chưa được đăng.');\r\nif (!caption) return reply('Ảnh/video này chưa có caption nên chưa được đăng.');\r\nconst journalFile = receiptPath(context.messageId);\r\ntry { fs.writeFileSync(journalFile, JSON.stringify({ ...context, status: 'received', createdAt: new Date().toISOString(), text: 'Đã nhận bài, đang chuẩn bị đăng.' }), { flag: 'wx', mode: 0o600 }); }\r\ncatch (error) { if (error.code === 'EEXIST') return []; throw error; }\r\nreturn [{ json: { ...context, journalFile, caption, isAiGenerated: medium.isAiGenerated, media: [medium], shouldPublish: true } }];\r\n"
+      }
+    },
+    {
+      "id": "is-crop-request",
+      "name": "Is Crop Request",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        2400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "isCropRequest",
+              "leftValue": "={{ $json.isCropRequest }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "download-crop-image",
+      "name": "Download Crop Image",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        2400
+      ],
+      "parameters": {
+        "resource": "file",
+        "operation": "get",
+        "fileId": "={{ $json.fileId }}",
+        "download": true,
+        "additionalFields": {}
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 2000
+    },
+    {
+      "id": "crop-long-image",
+      "name": "Crop Long Image",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        2400
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'http://image-tools:3000/crop?output=' + (['parts', 'png'].includes($('Telegram Intake').first().json.cropOutput) ? $('Telegram Intake').first().json.cropOutput : 'collage') }}",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 60000,
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "prepare-crop-result",
+      "name": "Prepare Crop Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        2400
+      ],
+      "parameters": {
+        "jsCode": "const publisherConfig = {\"allowedUserIds\":[6729441444],\"allowedChatIds\":[6729441444],\"channelId\":\"6ae04e2c2f1f5ed648e6e5cc\",\"publicBaseUrl\":\"https://beijing-manchester-shade-genes.trycloudflare.com\",\"services\":[\"tiktok\",\"facebook\",\"threads\"],\"albumQuietMs\":3000,\"queue\":{\"enabled\":true,\"hours\":[9,14,20],\"lowWatermark\":3,\"maxPendingPerChannel\":9},\"mediaWebhookId\":\"72b6fa94-2772-4442-bd42-5b4d07e37206\"};\nconst context = $('Telegram Intake').first().json;\nconst item = $input.first();\nconst expectedMime = context.cropOutput === 'parts' ? 'application/zip' : context.cropOutput === 'png' ? 'image/png' : 'image/jpeg';\nif (item.json.error || !item.binary?.data || item.binary.data.mimeType !== expectedMime) {\n  const failure = item.json.error?.message ?? item.json.error ?? '';\n  const text = String(failure).includes('429')\n    ? 'Bot đang cắt ảnh khác. Hãy gửi lại ảnh sau ít giây. /done để thoát.'\n    : 'Chưa cắt được ảnh. Hãy gửi File/Tài liệu gốc JPG/PNG/WEBP, rộng ít nhất 240px, cao ít nhất gấp 2 lần chiều rộng, tối đa 20 MB và 40 triệu pixel. Không gửi bản ảnh đã bị Telegram nén. Nếu file hợp lệ, kiểm tra dịch vụ xử lý ảnh rồi gửi lại. /done để thoát.';\n  return [{ json: { ...context, hasCropResult: false, text } }];\n}\nconst extension = context.cropOutput === 'parts' ? 'zip' : context.cropOutput === 'png' ? 'png' : 'jpg';\nitem.binary.data.fileName = (context.cropSourceName || 'anh') + (extension === 'zip' ? '-3-phan.zip' : '-ghep.' + extension);\nconst fs = require('fs');\nconst crypto = require('crypto');\nconst bytes = await this.helpers.getBinaryDataBuffer(0, 'data');\nconst name = crypto.randomBytes(16).toString('hex') + '_' + (Date.now() + 86400000) + '.' + extension;\nfs.writeFileSync('/files/' + name, bytes, { mode: 0o600 });\nconst cropDownloadUrl = `${publisherConfig.publicBaseUrl}/webhook/${publisherConfig.mediaWebhookId}/buffer-media/${name}`;\nreturn [{ json: { ...context, hasCropResult: true, cropDownloadUrl }, binary: item.binary }];\n"
+      }
+    },
+    {
+      "id": "has-crop-result",
+      "name": "Has Crop Result",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        960,
+        2400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "hasCropResult",
+              "leftValue": "={{ $json.hasCropResult }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "send-crop-image",
+      "name": "Send Crop Image",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        2400
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendDocument",
+        "chatId": "={{ $json.chatId }}",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{ ($json.cropOutput === 'parts' ? '✂️ ZIP chứa 3 phần PNG gốc, không thu nhỏ.' : '✂️ Ảnh ghép ' + ($json.cropOutput === 'png' ? 'PNG' : 'JPG chất lượng cao') + '. Độ nét phụ thuộc file gốc.') + ($json.cropDownloadUrl ? '\\nTải trực tiếp (24 giờ): ' + $json.cropDownloadUrl : '') + '\\n/crop png — PNG; /crop parts — 3 phần gốc; /done — thoát.' }}",
+          "reply_to_message_id": "={{ $json.messageId }}",
+          "appendAttribution": false
+        }
+      },
+      "onError": "continueRegularOutput",
+      "retryOnFail": false
+    },
+    {
+      "id": "record-crop-delivery",
+      "name": "Record Crop Delivery",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1440,
+        2400
+      ],
+      "parameters": {
+        "jsCode": "const context = $('Telegram Intake').first().json;\nconst response = $input.first().json;\nconst sent = response.result ?? response;\nconst failed = response.error || response.ok === false || !sent.document?.file_id;\nconst fs = require('fs');\nfs.writeFileSync(context.cropReceiptFile, JSON.stringify({ status: failed ? 'unknown' : 'sent', completedAt: new Date().toISOString() }), { mode: 0o600 });\nif (failed) return [{ json: { ...context, text: 'Chưa xác nhận được việc gửi ảnh kết quả. Kiểm tra cuộc trò chuyện; nếu chưa nhận được, hãy gửi lại ảnh. /done để thoát.' } }];\nreturn [];\n"
       }
     },
     {
@@ -1471,7 +1638,7 @@
         1920
       ],
       "parameters": {
-        "jsCode": "const name = $input.first().json.params?.fileName;\nconst queueMedia = typeof name === 'string' && /^queue_[a-f0-9]{32}\\.(mp4|mov|webm|jpg|jpeg|png|webp)$/.exec(name);\nconst match = typeof name === 'string' && /^([a-f0-9]{32})_(\\d{13})\\.(mp4|mov|webm|jpg|jpeg|png|webp)$/.exec(name);\nif (!queueMedia && (!match || Number(match[2]) <= Date.now())) throw new Error('File không tồn tại hoặc link đã hết hạn.');\nconst mimeTypes = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };\nreturn [{ json: { localFile: `/files/${name}`, mimeType: mimeTypes[queueMedia ? queueMedia[1] : match[3]] } }];\n"
+        "jsCode": "const name = $input.first().json.params?.fileName;\nconst queueMedia = typeof name === 'string' && /^queue_[a-f0-9]{32}\\.(mp4|mov|webm|jpg|jpeg|png|webp)$/.exec(name);\nconst match = typeof name === 'string' && /^([a-f0-9]{32})_(\\d{13})\\.(mp4|mov|webm|jpg|jpeg|png|webp|zip)$/.exec(name);\nif (!queueMedia && (!match || Number(match[2]) <= Date.now())) throw new Error('File không tồn tại hoặc link đã hết hạn.');\nconst mimeTypes = { mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp', zip: 'application/zip' };\nreturn [{ json: { localFile: `/files/${name}`, mimeType: mimeTypes[queueMedia ? queueMedia[1] : match[3]] } }];\n"
       }
     },
     {
@@ -1538,7 +1705,7 @@
       "main": [
         [
           {
-            "node": "Is Album",
+            "node": "Is Crop Request",
             "type": "main",
             "index": 0
           }
@@ -1939,6 +2106,97 @@
         [
           {
             "node": "Send Video",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Crop Request": {
+      "main": [
+        [
+          {
+            "node": "Download Crop Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Is Album",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download Crop Image": {
+      "main": [
+        [
+          {
+            "node": "Crop Long Image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Crop Long Image": {
+      "main": [
+        [
+          {
+            "node": "Prepare Crop Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Crop Result": {
+      "main": [
+        [
+          {
+            "node": "Has Crop Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Crop Result": {
+      "main": [
+        [
+          {
+            "node": "Send Crop Image",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Crop Image": {
+      "main": [
+        [
+          {
+            "node": "Record Crop Delivery",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Record Crop Delivery": {
+      "main": [
+        [
+          {
+            "node": "Telegram Reply",
             "type": "main",
             "index": 0
           }

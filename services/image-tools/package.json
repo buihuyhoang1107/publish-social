@@ -1,0 +1,13 @@
+{
+  "name": "social-publisher-image-tools",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test image-tools.test.cjs"
+  },
+  "dependencies": {
+    "fflate": "0.8.3",
+    "sharp": "0.35.5"
+  }
+}

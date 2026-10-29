@@ -92,7 +92,7 @@ async function main() {
   }
   fs.mkdirSync(temporaryDirectory, { recursive: true });
   console.log('Khoi dong n8n...');
-  docker(['up', '-d', 'n8n'], { stdio: 'inherit' });
+  docker(['up', '-d', 'n8n', 'image-tools'], { stdio: 'inherit' });
   await waitHealthy('http://localhost:5678');
 
   const containerWorkflowFile = '/tmp/telegram-startup-workflow.json';

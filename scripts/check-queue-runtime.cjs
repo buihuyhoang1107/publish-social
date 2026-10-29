@@ -18,7 +18,7 @@ if (process.argv.includes('--prepare')) {
       node.parameters = { httpMethod: 'POST', path: node.name === 'Telegram Trigger' ? 'queue-message' : 'queue-tick', responseMode: 'onReceived', options: {} }; node.disabled = false;
       node.webhookId = node.name === 'Telegram Trigger' ? 'queue-test-message' : 'queue-test-tick';
     }
-    if (node.name === 'Telegram Intake') node.parameters.jsCode = node.parameters.jsCode.replace('$input.first().json.message', '$input.first().json.body.message');
+    if (node.name === 'Telegram Intake') node.parameters.jsCode = node.parameters.jsCode.replace('$input.first().json;', '$input.first().json.body;');
     if (node.name === 'Download Media') { node.type = 'n8n-nodes-base.code'; node.typeVersion = 2; node.parameters = legacyFixture.nodes.find(item => item.name === 'Download Media').parameters; }
     if (node.name === 'Telegram Accepted') { node.type = 'n8n-nodes-base.noOp'; node.typeVersion = 1; node.parameters = {}; }
     if (['Telegram Reply', 'Queue Notification'].includes(node.name)) {

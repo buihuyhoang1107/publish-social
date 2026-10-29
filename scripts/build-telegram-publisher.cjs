@@ -9,7 +9,7 @@ config.albumQuietMs ??= 3000;
 config.queue ??= { enabled: true, hours: [9, 14, 20], lowWatermark: 3, maxPendingPerChannel: 9 };
 if (config.queue.enabled && JSON.stringify(config.queue.hours) !== '[9,14,20]') throw new Error('Khung giờ được duyệt: 09:00, 14:00, 20:00 giờ Việt Nam.');
 const code = (name) => fs.readFileSync(path.join(root, `workflows/code/${name}.js`), 'utf8');
-const inject = (name) => 'const publisherConfig = ' + JSON.stringify(config) + ';\n' + (name.startsWith('telegram-queue-') || name === 'telegram-album-intake' ? code('telegram-queue-store') + '\n' : '') + code(name);
+const inject = (name) => 'const publisherConfig = ' + JSON.stringify(config) + ';\n' + (name.startsWith('telegram-queue-') || name === 'telegram-album-intake' ? code('telegram-queue-store') + '\n' : '') + (name === 'telegram-album-intake' ? code('telegram-image-crop-intake') + '\n' : '') + code(name);
 const node = (name, type, version, parameters, extra = {}) => ({ id: name.toLowerCase().replaceAll(' ', '-'), name, type: `n8n-nodes-base.${type}`, typeVersion: version, position: [0, 0], parameters, ...extra });
 const condition = (key) => ({ conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 }, conditions: [{ id: key, leftValue: `={{ $json.${key} }}`, rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' }, options: {} });
 const http = buffer.nodes.find((item) => item.name === 'Read Buffer Account').parameters;
@@ -20,6 +20,13 @@ const retryReplyMarkup = { replyMarkup: '={{ $json.retryMessageId ? "inlineKeybo
 const nodes = [
   node('Telegram Trigger', 'telegramTrigger', 1.5, { updates: ['message', 'callback_query'], additionalFields: { download: false, userIds: config.allowedUserIds.join(','), chatIds: config.allowedChatIds.join(',') } }, { webhookId: 'b9b17288-112f-48bf-912e-37113d0af7ac' }),
   node('Telegram Intake', 'code', 2, { jsCode: inject('telegram-album-intake') }),
+  node('Is Crop Request', 'if', 2.2, condition('isCropRequest')),
+  node('Download Crop Image', 'telegram', 1.2, { resource: 'file', operation: 'get', fileId: '={{ $json.fileId }}', download: true, additionalFields: {} }, { onError: 'continueRegularOutput', retryOnFail: true, maxTries: 3, waitBetweenTries: 2000 }),
+  node('Crop Long Image', 'httpRequest', 4.2, { method: 'POST', url: "={{ 'http://image-tools:3000/crop?output=' + (['parts', 'png'].includes($('Telegram Intake').first().json.cropOutput) ? $('Telegram Intake').first().json.cropOutput : 'collage') }}", sendBody: true, contentType: 'binaryData', inputDataFieldName: 'data', options: { timeout: 60000, response: { response: { responseFormat: 'file', outputPropertyName: 'data' } } } }, { onError: 'continueRegularOutput', retryOnFail: false }),
+  node('Prepare Crop Result', 'code', 2, { jsCode: inject('telegram-image-crop-result') }),
+  node('Has Crop Result', 'if', 2.2, condition('hasCropResult')),
+  node('Send Crop Image', 'telegram', 1.2, { resource: 'message', operation: 'sendDocument', chatId: '={{ $json.chatId }}', binaryData: true, binaryPropertyName: 'data', additionalFields: { caption: "={{ ($json.cropOutput === 'parts' ? '✂️ ZIP chứa 3 phần PNG gốc, không thu nhỏ.' : '✂️ Ảnh ghép ' + ($json.cropOutput === 'png' ? 'PNG' : 'JPG chất lượng cao') + '. Độ nét phụ thuộc file gốc.') + ($json.cropDownloadUrl ? '\\nTải trực tiếp (24 giờ): ' + $json.cropDownloadUrl : '') + '\\n/crop png — PNG; /crop parts — 3 phần gốc; /done — thoát.' }}", reply_to_message_id: '={{ $json.messageId }}', appendAttribution: false } }, { onError: 'continueRegularOutput', retryOnFail: false }),
+  node('Record Crop Delivery', 'code', 2, { jsCode: code('telegram-image-crop-record') }),
   node('Is Album', 'if', 2.2, condition('isAlbum')),
   node('Wait For Album', 'wait', 1.1, { resume: 'timeInterval', amount: 5, unit: 'seconds' }, { webhookId: '259ba641-73be-4487-a968-684d0dd25de5' }),
   node('Collect Album', 'code', 2, { jsCode: inject('telegram-album-collect') }),
@@ -92,6 +99,9 @@ for (const sequence of [
   ['Report Preparation Failure', 'Summarize Results'],
   ['Video Download', 'Check Media Link', 'Read Video', 'Send Video'],
 ]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
+link('Telegram Intake', 'Is Crop Request'); link('Is Crop Request', 'Download Crop Image'); link('Is Crop Request', 'Is Album', 1);
+for (const sequence of [['Download Crop Image', 'Crop Long Image', 'Prepare Crop Result', 'Has Crop Result', 'Send Crop Image', 'Record Crop Delivery', 'Telegram Reply']]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
+link('Has Crop Result', 'Telegram Reply', 1);
 link('Is Album', 'Should Publish', 1); link('Album Ready', 'Wait For Album', 1);
 link('Download Each Media', 'Download Media', 1); link('Download Media', 'Download Each Media');
 link('Should Publish', 'Is Queue Command', 1); link('Is Queue Command', 'Has Queue Callback'); link('Is Queue Command', 'Is Status Request', 1);

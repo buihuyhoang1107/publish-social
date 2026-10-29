@@ -21,5 +21,17 @@ services:
       - n8n_data:/home/node/.n8n
       - ./downloads/buffer-media:/files
 
+  image-tools:
+    build: ./services/image-tools
+    restart: unless-stopped
+    init: true
+    mem_limit: 1280m
+    cpus: 1
+    read_only: true
+    tmpfs:
+      - /tmp:size=128m
+    security_opt:
+      - no-new-privileges:true
+
 volumes:
   n8n_data:

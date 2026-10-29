@@ -19,6 +19,29 @@ Gửi `/new` trong chat riêng với bot để bắt đầu, `/preview` để m�
 `/cancel` để hủy bản nháp.
 Không cần import lại hay bấm Execute. Xem [menu V2](docs/TELEGRAM_MENU.md).
 
+## Cắt ảnh dài qua Telegram
+
+- Gửi `/crop` rồi gửi **một ảnh dài dạng File/Tài liệu gốc**. Bot sẽ nhắc gửi lại
+  nếu nhận bản Ảnh bị Telegram nén; ảnh dài có thể bị thu nhỏ tới mức mất nét chữ.
+- Bot cắt thành 3 phần theo chiều dọc, xếp trái → phải, thêm viền trắng và nền mờ;
+  giữ bố cục đã dùng cho ảnh mẫu đầu tiên. Mặc định trả JPG chất lượng cao 3240 × 5760
+  để dễ tải; `/crop png` trả PNG. Tên file theo ảnh nguồn để tránh nhầm giữa các kết quả.
+  Nội dung ảnh không được vẽ lại, không tự xóa phần đen hoặc khoảng trống trong ảnh gốc.
+- Kết quả có link tải trực tiếp dự phòng, hết hạn sau 24 giờ. Máy/n8n/tunnel cần đang
+  chạy; nếu tunnel đổi hostname thì link cũ không còn dùng được.
+- `/crop parts`: trả ZIP chứa `phan-1.png`, `phan-2.png`, `phan-3.png`, cắt đúng
+  kích thước nguồn, không thu nhỏ; phù hợp khi cần đọc rõ chữ hoặc tự ghép lại.
+  Tăng kích thước xuất không thể khôi phục chi tiết đã mất trong ảnh nguồn.
+- Chế độ cắt vẫn bật cho các ảnh tiếp theo. Gửi `/done` để quay lại luồng đăng bài.
+- Ảnh trong chế độ cắt không được đưa vào kho hoặc gửi Buffer. Không gửi album.
+- JPG/PNG/WEBP tĩnh, tối đa 20 MB, 40 triệu pixel, rộng ít nhất 240px và cao ít nhất gấp đôi chiều rộng.
+  Điểm cắt ưu tiên vùng ít chi tiết gần 1/3 và 2/3; không bảo đảm tránh mọi đoạn chữ/ảnh.
+- `node scripts/start-telegram.cjs` khởi động cả n8n và dịch vụ `image-tools` nội bộ.
+  Khi thay code xử lý ảnh: `docker compose up -d --build image-tools`.
+- Kiểm tra: `scripts/check-crop-routing.cjs`, `scripts/check-crop-runtime.cjs` dùng
+  thư mục/instance n8n riêng và Telegram giả lập; `services/image-tools/image-tools.test.cjs`
+  kiểm tra kích thước/thứ tự cột và chặn ảnh không hợp lệ với bộ xử lý ảnh thật.
+
 ## Chạy trên Windows
 
 Với instance Telegram hiện tại đã thiết lập, mở Docker Desktop rồi chạy:
