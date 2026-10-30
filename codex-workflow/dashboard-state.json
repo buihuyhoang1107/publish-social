@@ -1,54 +1,51 @@
 {
   "version": 1,
   "task": {
-    "id": "wedding-film-25d",
-    "title": "Phim cưới 2.5D qua Telegram",
-    "goal": "Kiểm chứng cảnh chuyển động bằng model chạy tại máy trước khi nối Telegram",
-    "status": "working",
+    "id": "remove-animation",
+    "title": "Gỡ chức năng tạo phim",
+    "goal": "Giữ đăng bài tự động và cắt ảnh, xóa bộ dựng riêng",
+    "status": "done",
     "criteria": [
-      "Có khung hình nhân vật, cấu hình cảnh và kết quả benchmark thực tế"
+      "Workflow không còn nhánh phim, kiểm tra queue retry crop đạt"
     ]
   },
   "roles": {
     "implement": {
-      "status": "planned",
-      "action": "Đã lưu keyframe, kịch bản 30s và script benchmark; chưa chạy inference vì bộ tải GPU/model chưa đầy đủ",
+      "status": "done",
+      "action": "Đã gỡ bộ dựng/model và nhánh phim khỏi workflow đang chạy, giữ đăng bài tự động và cắt ảnh",
       "phase": "handoff",
-      "updated_at": "2026-10-29T13:54:46+07:00",
-      "next": "Hoàn tất dependencies/model rồi chạy và review cảnh chuyển động, sau đó mới nối Telegram",
+      "updated_at": "2026-10-30T11:14:02+07:00",
+      "next": "Tiếp tục gửi nội dung qua Telegram để tự xếp lịch như trước",
       "files": [
-        "services/film-tools/render_benchmark.py",
-        "services/film-tools/download_model.py",
-        "output/wedding-film-25d/episode-01.json"
+        "scripts/build-telegram-publisher.cjs",
+        "scripts/start-telegram.cjs",
+        "workflows/code/telegram-album-intake.js",
+        "workflows/telegram-publisher.json"
       ],
       "checks": [
         {
           "status": "PASS",
-          "label": "py_compile hai script; timeline 6 cảnh liên tiếp đủ 30s; keyframe tồn tại"
-        },
-        {
-          "status": "NOT_RUN",
-          "label": "GPU inference, thoại, lip sync và Telegram chưa kiểm thử"
+          "label": "Crop routing, queue retry, content queue, syntax và live75nodes không nhánh phim, public health200"
         }
       ]
     }
   },
   "events": [
     {
-      "at": "2026-10-29T13:54:46+07:00",
-      "role": "implement",
-      "message": "Đã lưu keyframe, kịch bản 30s và script benchmark; chưa chạy inference vì bộ tải GPU/model chưa đầy đủ"
-    },
-    {
-      "at": "2026-10-29T13:46:29+07:00",
-      "role": "implement",
-      "message": "Đã tạo keyframe 2.5D, đang chuẩn bị môi trường GPU riêng"
-    },
-    {
-      "at": "2026-10-29T13:46:28+07:00",
+      "at": "2026-10-30T11:14:03+07:00",
       "role": "lead",
-      "message": "Nhiệm vụ: Phim cưới 2.5D qua Telegram (working)"
+      "message": "Nhiệm vụ: Gỡ chức năng tạo phim (done)"
+    },
+    {
+      "at": "2026-10-30T11:14:02+07:00",
+      "role": "implement",
+      "message": "Đã gỡ bộ dựng/model và nhánh phim khỏi workflow đang chạy, giữ đăng bài tự động và cắt ảnh"
+    },
+    {
+      "at": "2026-10-30T11:12:34+07:00",
+      "role": "lead",
+      "message": "Nhiệm vụ: Gỡ chức năng tạo phim (working)"
     }
   ],
-  "updated_at": "2026-10-29T13:54:46+07:00"
+  "updated_at": "2026-10-30T11:14:03+07:00"
 }

@@ -1,22 +1,15 @@
 ﻿# Tiếp tục công việc
 
-- Cập nhật: 29/10/2026. Trạng thái: đang chọn kiến trúc phim Telegram.
-- Quy tắc: đọc codex-workflow/README.md; không dùng bất kỳ lệnh Git nào; không tự đăng thử lên kênh thật.
-- Production: n8n workflow seKtuQgWny3K7y5m, Telegram → Buffer; giữ nguyên lịch và queue hiện có.
-- Crop đã triển khai: /crop JPG, /crop png, /crop parts ZIP; /done thoát; link tải dự phòng 24 giờ. Giữ cách chia 3 cột đã được duyệt, không tự bỏ vùng đen.
-- Retry đã sửa: bài tương lai giữ dueAt, chỉ bài quá giờ dùng shareNow. Không hồi quy lỗi đăng sớm.
-- Bản phim cũ trong output/film-pilot-30s chỉ là animatic một ảnh + phụ đề, chưa có giọng/khớp miệng; không coi là phim chuyển động hoàn chỉnh.
-- Yêu cầu mới: gửi lệnh Telegram làm phim hoạt hình có hội thoại, cùng hai nhân vật qua nhiều tập: quen nhau → cưới/thiệp cưới → nhà và con. Hạn chế API trả phí.
-- Đã xác minh phần cứng: RTX 4060 Ti 8188 MiB VRAM, RAM 31.8 GB, 28 CPU threads; ổ D còn khoảng 100 GB.
-- Đã đọc source intake/builder: chế độ phim phải được xử lý trước đường nhận nội dung đăng bài; cần job queue riêng và gửi kết quả về Telegram.
-- Đã đối chiếu upstream: ComfyUI có local API/queue; LTX-Video có hướng lượng tử hóa cho GPU 8 GB; cần benchmark thực tế trước hứa tốc độ/chất lượng.
-- WanGP hỗ trợ model ít VRAM, nhưng license hiện tại có điều kiện khi nhúng vào dịch vụ trả phí. Không mặc định chọn làm nền tảng sản phẩm nhiều người dùng.
-- VieNeu-TTS v3 Turbo có CPU/ONNX, giọng Việt và model card Apache-2.0; chưa tải hoặc kiểm thử tại máy này.
-- User chốt phong cách: 2.5D/cinematic 3D nhẹ cho TikTok/Reels thieponline.org.
-- Đã tạo keyframe mới bằng built-in imagegen: output/wedding-film-25d/scene-01-keyframe.png; prompt nguyên văn trong keyframe-prompt.txt. Đây vẫn là ảnh tĩnh, chưa là chuyển động.
-- Đã viết episode-01.json: Tấm thiệp đầu tiên, 6 cảnh liên tiếp đủ 30s; series từ gặp gỡ đến nhà/con.
-- Source mới: services/film-tools/render_benchmark.py, download_model.py, requirements.txt, README.md; giữ CPU text encoder và GPU video, cache prompt, ghi timing/VRAM. Chưa kiểm thử inference.
-- PASS py_compile hai script; JSON hợp lệ, timeline 30s, keyframe tồn tại. Chưa có MP4 chuyển động/hội thoại/lip-sync.
-- Đã cài uv trong temp/film-bootstrap và Python 3.11 trong tools/python, tạo temp/film-local-venv. Lượt tải torch CUDA 2.6.0 và model LTX 0.9.5 (25.6GB) dừng do tốc độ tải chậm/dung lượng; model còn partial, torch chưa cài xong. Không có tải nền tiếp tục.
-- Model revision ghim e58e28c39631af4d1468ee57a853764e11c1d37e; model Open RAIL-M, giữ license khi dùng/phân phối. Chưa bật /film, chưa thay đổi workflow production.
-- Bước tiếp: hoàn tất môi trường/dependencies và tải model từ cache theo README; chạy cảnh thử để đo/kiểm tra mặt-tay-chuyển động. Sau khi đạt mới tích hợp worker Telegram. Không coi prototype này là công cụ Telegram đã hoàn thành.
+- Cập nhật: 30/10/2026. Trạng thái: hoàn tất yêu cầu gỡ chức năng tạo phim.
+- User đã hủy hướng làm phim; chỉ tiếp tục đăng bài tự động. Không khởi động lại bộ dựng/tải model hoặc khôi phục tính năng đã gỡ.
+- Bắt buộc theo codex-workflow/README.md và AGENTS.md; tuyệt đối không dùng Git.
+- Production n8n seKtuQgWny3K7y5m đã publish bản 75 nodes, activeVersionId=versionId, không còn nhánh/lịch/metadata tạo phim.
+- Giữ nguyên các node đăng bài, credentials, connections còn lại; chỉ gỡ 7 node phim và phần xử lý lệnh trong Telegram Intake. Bản clean kiểm chứng: temp/social-publisher-clean-active.json.
+- Đã dừng worker và các tiến trình dựng/tải liên quan; xóa code, scripts/test riêng, model, môi trường Python riêng, bản thử, job/session/dữ liệu tạm và các bản sao phục vụ phim trong workspace. Dọn các bản runtime thử riêng trong /tmp của n8n.
+- Giữ nguyên Python hệ thống, Docker, image-tools, tunnel, ảnh/video và dữ liệu hàng đợi đăng bài của người dùng. Không xóa hay đăng lại bài trên các kênh thật.
+- /film không còn được hỗ trợ hoặc xuất hiện trong hướng dẫn bot. scripts/start-telegram.cjs không còn khởi động worker phim.
+- Vận hành: gửi ảnh/album/video kèm caption để tự duyệt và xếp lịch; /queue xem kho/lịch, /status xem kết quả, /retry đăng lại kênh lỗi, /cancel hủy bài chưa gửi.
+- Lịch giữ 09:00, 14:00, 20:00 giờ Việt Nam. Retry bài tương lai phải giữ dueAt; chỉ bài quá giờ mới shareNow.
+- Crop giữ /crop JPG, /crop png, /crop parts ZIP, /done; giữ cách chia3 cột đã duyệt và link tải dự phòng24h, không tự bỏ vùng đen.
+- PASS: crop routing, queue retry, content queue trong Linux; syntax source; so khớp tham số/credentials/connections sau publish; kiểm tra live75nodes không code/metadata phim; local/public health200.
+- Bước tiếp: tiếp tục vận hành đăng bài như trước. Không còn việc tồn đọng của yêu cầu gỡ tính năng.
