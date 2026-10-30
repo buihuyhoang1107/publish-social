@@ -5,6 +5,7 @@ const handleCropMessage = (message, context) => {
   const key = context.chatId + ':' + message.from.id;
   const reply = text => [{ json: { ...context, text } }];
   if (directive === '/crop' || directive === '/done') {
+    if (directive === '/crop' && queueStore.read().batchSessions?.[key]) return reply('Bạn đang gom bài theo đợt. /batch preview để xem và xác nhận, hoặc /batch cancel trước khi bật cắt ảnh.');
     const result = queueStore.transact(state => {
       state.cropSessions ??= {};
       if (directive === '/crop') state.cropSessions[key] = partsRequested ? 'parts' : selectedOutput === 'png' ? 'png' : 'collage';

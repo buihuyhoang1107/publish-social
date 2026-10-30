@@ -1,15 +1,21 @@
 const context = $input.first().json;
 const [command, ...args] = context.commandText.split(/\s+/);
+if (command === '/calendar') return [{ json: { ...context, ...calendarTools.render(queueStore.read(), context, args) } }];
 const result = queueStore.transact(state => {
   const key = context.chatId + ':' + (context.commandKey ?? context.messageId);
   if (state.commands[key]) return { ...state.commands[key], runQueue: false };
+  if (command === '/batch') {
+    const response = { runQueue: false, ...bulkPlanTools.handle(state, context, args) };
+    state.commands[key] = response;
+    return response;
+  }
   const posts = state.posts.filter(post => post.chatId === context.chatId);
   let text;
   let runQueue = false;
   if (command === '/queue') {
     const page = /^\d+$/.test(args[0] ?? '') ? Math.max(1, Number(args[0])) : 1;
     const active = posts.filter(post => !['sent', 'cancelled'].includes(post.status));
-    const counts = ['draft', 'approved', 'scheduling', 'scheduled', 'partial', 'attention'].map(status => `${queueStore.labels[status]}: ${active.filter(post => post.status === status).length}`).join(' | ');
+    const counts = ['batch', 'draft', 'approved', 'scheduling', 'scheduled', 'partial', 'attention'].map(status => `${queueStore.labels[status]}: ${active.filter(post => post.status === status).length}`).join(' | ');
     const listed = active.slice((page - 1) * 8, page * 8);
     text = `Kho nội dung — 09:00, 14:00, 20:00 (giờ Việt Nam)\n${counts}\n\n` + (listed.length ? listed.map(post => `#${post.messageId} — ${queueStore.labels[post.status]}${post.dueAt ? '\n' + queueStore.formatTime(post.dueAt) : ''}\n${post.caption.slice(0, 120)}${Array.from(post.caption).length > 499 && publisherConfig.services.includes('threads') ? '\n⚠ Threads vượt 499 ký tự, sẽ bỏ qua.' : ''}`).join('\n\n') : 'Không có bài trong trang này.') + `\n\nTrang ${page}/${Math.max(1, Math.ceil(active.length / 8))}. /queue 2 để xem trang tiếp.\nBài mới được tự động duyệt và xếp lịch.\n/approve all — duyệt nháp cũ còn chờ\n/cancel <mã bài> — hủy bài chưa gửi Buffer.`;
   } else if (command === '/retry') {
@@ -32,7 +38,7 @@ const result = queueStore.transact(state => {
       const refused = [];
       for (const post of selected) {
         if (command === '/approve' && post.status === 'draft') { post.status = 'approved'; post.approvedAt = new Date().toISOString(); changed.push(post); }
-        else if (command === '/cancel' && ['draft', 'approved'].includes(post.status) && !post.targets?.length) { post.status = 'cancelled'; changed.push(post); }
+        else if (command === '/cancel' && ['draft', 'approved', 'attention'].includes(post.status) && !post.targets?.length) { post.status = 'cancelled'; changed.push(post); }
         else refused.push(post);
       }
       runQueue = command === '/approve' && changed.length > 0;

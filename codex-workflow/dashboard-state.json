@@ -1,55 +1,21 @@
 {
   "version": 1,
   "task": {
-    "id": "remove-animation",
-    "title": "Gỡ chức năng tạo phim",
-    "goal": "Giữ đăng bài tự động và cắt ảnh, xóa bộ dựng riêng",
-    "status": "done",
+    "id": "telegram-calendar-bulk",
+    "title": "Lịch Telegram và xếp lịch theo đợt",
+    "goal": "Xem ngày tuần tháng, gom nhiều bài, xem trước và xác nhận lịch đúng giờ Việt Nam",
+    "status": "working",
     "criteria": [
-      "Workflow không còn nhánh phim, kiểm tra queue retry crop đạt"
+      "Có lịch bấm chọn và đợt preview-confirm, không sửa bài đã gửi Buffer hoặc đăng sớm"
     ]
   },
-  "roles": {
-    "implement": {
-      "status": "done",
-      "action": "Đã đổi ba nhãn Video gây nhầm thành Media và publish, route file phục vụ đăng bài vẫn hoạt động",
-      "phase": "handoff",
-      "updated_at": "2026-10-30T11:22:28+07:00",
-      "next": "Người dùng refresh n8n để thấy nhãn mới, tiếp tục gửi nội dung đăng bài",
-      "files": [
-        "scripts/build-buffer-workflow.cjs",
-        "scripts/build-telegram-publisher.cjs",
-        "workflows/telegram-publisher.json"
-      ],
-      "checks": [
-        {
-          "status": "PASS",
-          "label": "Live75nodes không nhãn Film/Video, GET PNG nguyên byte/MIME và HEAD200, media repair test; không đăng thử"
-        }
-      ]
-    }
-  },
+  "roles": {},
   "events": [
     {
-      "at": "2026-10-30T11:22:28+07:00",
-      "role": "implement",
-      "message": "Đã đổi ba nhãn Video gây nhầm thành Media và publish, route file phục vụ đăng bài vẫn hoạt động"
-    },
-    {
-      "at": "2026-10-30T11:14:03+07:00",
+      "at": "2026-10-30T13:00:27+07:00",
       "role": "lead",
-      "message": "Nhiệm vụ: Gỡ chức năng tạo phim (done)"
-    },
-    {
-      "at": "2026-10-30T11:14:02+07:00",
-      "role": "implement",
-      "message": "Đã gỡ bộ dựng/model và nhánh phim khỏi workflow đang chạy, giữ đăng bài tự động và cắt ảnh"
-    },
-    {
-      "at": "2026-10-30T11:12:34+07:00",
-      "role": "lead",
-      "message": "Nhiệm vụ: Gỡ chức năng tạo phim (working)"
+      "message": "Nhiệm vụ: Lịch Telegram và xếp lịch theo đợt (working)"
     }
   ],
-  "updated_at": "2026-10-30T11:22:28+07:00"
+  "updated_at": "2026-10-30T13:00:27+07:00"
 }

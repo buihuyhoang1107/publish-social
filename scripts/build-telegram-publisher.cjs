@@ -9,14 +9,14 @@ config.albumQuietMs ??= 3000;
 config.queue ??= { enabled: true, hours: [9, 14, 20], lowWatermark: 3, maxPendingPerChannel: 9 };
 if (config.queue.enabled && JSON.stringify(config.queue.hours) !== '[9,14,20]') throw new Error('Khung giờ được duyệt: 09:00, 14:00, 20:00 giờ Việt Nam.');
 const code = (name) => fs.readFileSync(path.join(root, `workflows/code/${name}.js`), 'utf8');
-const inject = (name) => 'const publisherConfig = ' + JSON.stringify(config) + ';\n' + (name.startsWith('telegram-queue-') || name === 'telegram-album-intake' ? code('telegram-queue-store') + '\n' : '') + (name === 'telegram-album-intake' ? code('telegram-image-crop-intake') + '\n' : '') + code(name);
+const inject = (name) => 'const publisherConfig = ' + JSON.stringify(config) + ';\n' + (name.startsWith('telegram-queue-') || name === 'telegram-album-intake' ? code('telegram-queue-store') + '\n' : '') + (name === 'telegram-album-intake' ? code('telegram-image-crop-intake') + '\n' : '') + (name === 'telegram-queue-command' ? code('telegram-calendar') + '\n' + code('telegram-bulk-plan') + '\n' : '') + code(name);
 const node = (name, type, version, parameters, extra = {}) => ({ id: name.toLowerCase().replaceAll(' ', '-'), name, type: `n8n-nodes-base.${type}`, typeVersion: version, position: [0, 0], parameters, ...extra });
 const condition = (key) => ({ conditions: { options: { caseSensitive: true, leftValue: '', typeValidation: 'strict', version: 2 }, conditions: [{ id: key, leftValue: `={{ $json.${key} }}`, rightValue: true, operator: { type: 'boolean', operation: 'true', singleValue: true } }], combinator: 'and' }, options: {} });
 const http = buffer.nodes.find((item) => item.name === 'Read Buffer Account').parameters;
 const oldPublish = buffer.nodes.find((item) => item.name === 'Publish TikTok');
 const mutation = oldPublish.parameters.jsonBody.match(/query: ("(?:[^"\\]|\\.)*")/)[1];
 const replyFields = { appendAttribution: false, parse_mode: 'HTML', reply_to_message_id: '={{ $json.messageId }}' };
-const retryReplyMarkup = { replyMarkup: '={{ $json.retryMessageId ? "inlineKeyboard" : "none" }}', inlineKeyboard: { rows: [{ row: { buttons: [{ text: '🔄 Đăng lại kênh lỗi', additionalFields: { callback_data: "={{ 'queue_retry:' + $json.retryMessageId }}" } }] } }] } };
+const retryReplyMarkup = { replyMarkup: '={{ $json.calendarKeyboard || $json.retryMessageId ? "inlineKeyboard" : "none" }}', inlineKeyboard: '={{ $json.calendarKeyboard ?? { rows: [{ row: { buttons: [{ text: "🔄 Đăng lại kênh lỗi", additionalFields: { callback_data: "queue_retry:" + $json.retryMessageId } }] } }] } }}' };
 const nodes = [
   node('Telegram Trigger', 'telegramTrigger', 1.5, { updates: ['message', 'callback_query'], additionalFields: { download: false, userIds: config.allowedUserIds.join(','), chatIds: config.allowedChatIds.join(',') } }, { webhookId: 'b9b17288-112f-48bf-912e-37113d0af7ac' }),
   node('Telegram Intake', 'code', 2, { jsCode: inject('telegram-album-intake') }),
@@ -33,6 +33,7 @@ const nodes = [
   node('Album Ready', 'if', 2.2, condition('albumReady')),
   node('Should Publish', 'if', 2.2, condition('shouldPublish')),
   node('Resolve Post', 'noOp', 1, {}),
+  node('Is Batch Upload', 'if', 2.2, condition('batchUpload')),
   node('Telegram Accepted', 'telegram', 1.2, { resource: 'message', operation: 'sendMessage', chatId: '={{ $json.chatId }}', text: "={{ " + JSON.stringify(config.queue.enabled ? 'Đã nhận bài, đang tải ảnh/video để lưu nháp. Bài chỉ được xếp lịch sau khi bạn duyệt.' : 'Đã nhận bài, đang gửi đăng lên các nền tảng đã kết nối. Bot sẽ báo kết quả từng kênh tại đây.') + " + (" + JSON.stringify(config.services.includes('threads')) + " && Array.from($json.caption).length > 499 ? '\\nLưu ý: caption có ' + Array.from($json.caption).length + ' ký tự, vượt mức tối đa 499 ký tự đã cấu hình. Bot sẽ bỏ qua Threads, không gửi đăng lên Threads. Các nền tảng khác vẫn tiếp tục.' : '') }}", replyMarkup: 'none', additionalFields: replyFields }, { onError: 'continueRegularOutput' }),
   node('Expand Media', 'code', 2, { jsCode: "const context = $('Resolve Post').first().json; return context.media.map((medium) => ({ json: { ...context, ...medium }, pairedItem: { item: 0 } }));" }),
   node('Download Each Media', 'splitInBatches', 3, { batchSize: 1, options: {} }),
@@ -100,6 +101,7 @@ for (const sequence of [
   ['Media Download', 'Check Media Link', 'Read Media File', 'Serve Media File'],
 ]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
 link('Telegram Intake', 'Is Crop Request'); link('Is Crop Request', 'Download Crop Image'); link('Is Crop Request', 'Is Album', 1);
+link('Resolve Post', 'Is Batch Upload'); link('Is Batch Upload', 'Expand Media'); link('Is Batch Upload', 'Telegram Accepted', 1);
 for (const sequence of [['Download Crop Image', 'Crop Long Image', 'Prepare Crop Result', 'Has Crop Result', 'Send Crop Image', 'Record Crop Delivery', 'Telegram Reply']]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
 link('Has Crop Result', 'Telegram Reply', 1);
 link('Is Album', 'Should Publish', 1); link('Album Ready', 'Wait For Album', 1);

@@ -29,14 +29,25 @@ const result = queueStore.transact(state => {
   if (!hasChannels || !Array.isArray(channelResponse.data?.channels) || channelResponse.errors?.length || pendingResponse?.errors?.length || !Array.isArray(pendingResponse?.data?.posts?.edges) || pendingResponse.data.posts.pageInfo?.hasNextPage) return { hasWork: false };
   let post = state.posts.find(item => item.targets?.some(target => target.status === 'planned'));
   if (!post) {
-    post = state.posts.find(item => item.status === 'approved');
+    const remote = pendingResponse.data.posts.edges.map(edge => edge.node);
+    const automaticSlots = new Map();
+    const candidateTime = item => {
+      if (item.scheduleLocked) return Date.parse(item.dueAt);
+      if (!automaticSlots.has(item.chatId)) automaticSlots.set(item.chatId, queueStore.nextSlot(state, item.chatId, remote.map(value => value.dueAt)));
+      return Date.parse(automaticSlots.get(item.chatId));
+    };
+    for (const item of state.posts) if (item.status === 'approved' && (!post || candidateTime(item) < candidateTime(post))) post = item;
     if (!post) return { hasWork: false };
+    if (post.scheduleLocked && (!Number.isFinite(Date.parse(post.dueAt)) || Date.parse(post.dueAt) <= Date.now() + 300000 || remote.some(item => Date.parse(item.dueAt) === Date.parse(post.dueAt)) || state.posts.some(item => item.id !== post.id && item.chatId === post.chatId && item.status !== 'cancelled' && Date.parse(item.dueAt) === Date.parse(post.dueAt)))) {
+      post.status = 'attention';
+      queueStore.addNotice(state, 'locked-slot:' + post.id, post.chatId, `Bài #${post.messageId}: lịch đã chọn bị trùng hoặc đã quá gần/qua giờ. Chưa gửi bài này sang Buffer; không tự đăng ngay hay đổi giờ. /calendar để kiểm tra. Hủy bài chưa gửi bằng /cancel ${post.messageId} rồi gửi lại trong đợt mới.`);
+      return { hasWork: false };
+    }
     const channels = publisherConfig.services.flatMap(service => {
       const connected = channelResponse.data.channels.filter(channel => channel.service === service);
       return connected.length ? connected : [{ id: 'missing-' + service, service, missing: true }];
     });
     const eligible = channel => !channel.missing && !channel.isDisconnected && !channel.isLocked && !(channel.service === 'threads' && Array.from(post.caption).length > 499);
-    const remote = pendingResponse.data.posts.edges.map(edge => edge.node);
     const remoteIds = new Set(remote.map(item => item.id));
     if (channels.some(channel => eligible(channel) && remote.filter(item => item.channelId === channel.id).length + state.posts.flatMap(item => item.targets ?? []).filter(target => target.channelId === channel.id && !remoteIds.has(target.postId) && ['planned', 'submitting', 'scheduled', 'sending', 'unknown'].includes(target.status)).length >= publisherConfig.queue.maxPendingPerChannel)) return { hasWork: false };
     if (post.mediaFiles.some(medium => !queueStore.fs.existsSync('/files/' + medium.name))) {
@@ -44,7 +55,7 @@ const result = queueStore.transact(state => {
       queueStore.addNotice(state, 'missing-media:' + post.id, post.chatId, `Bài #${post.messageId} thiếu file trong kho. Chưa gửi bất kỳ kênh nào; hãy gửi lại đầy đủ ảnh/video.`);
       return { hasWork: false };
     }
-    post.dueAt = queueStore.nextSlot(state, post.chatId, remote.map(item => item.dueAt));
+    if (!post.scheduleLocked) post.dueAt = new Date(candidateTime(post)).toISOString();
     post.targets = channels.map(channel => {
       const blocked = channel.missing || channel.isDisconnected || channel.isLocked;
       const tooLong = channel.service === 'threads' && Array.from(post.caption).length > 499;

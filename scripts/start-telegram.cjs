@@ -1,7 +1,9 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
-const { execFileSync } = require('node:child_process');
+const https = require('node:https');
+const { Resolver } = require('node:dns').promises;
+const { execFileSync, spawn } = require('node:child_process');
 
 const root = path.resolve(__dirname, '..');
 const workflowId = 'seKtuQgWny3K7y5m';
@@ -19,11 +21,66 @@ const powershell = source => execFileSync('powershell.exe', [
 ], { cwd: root, encoding: 'utf8', windowsHide: true, timeout: 30000 }).trim();
 const quote = value => "'" + value.replaceAll("'", "''") + "'";
 
+async function ensureDocker() {
+  const ready = () => {
+    try {
+      execFileSync('docker', ['info', '--format', '{{.ServerVersion}}'], {
+        windowsHide: true, stdio: 'ignore', timeout: 5000,
+      });
+      return true;
+    } catch (error) {
+      if (error.code === 'ENOENT') throw new Error('Chua tim thay Docker. Can cai Docker Desktop va mo lai terminal.');
+      return false;
+    }
+  };
+  if (ready()) return;
+  const desktopExecutable = path.join(process.env.ProgramFiles || 'C:\\Program Files', 'Docker', 'Docker', 'Docker Desktop.exe');
+  if (!fs.existsSync(desktopExecutable)) throw new Error('Hay mo Docker Desktop roi chay lai lenh nay.');
+  console.log('Mo Docker Desktop va cho Engine san sang (toi da 3 phut)...');
+  const desktop = spawn(desktopExecutable, [], { detached: true, windowsHide: true, stdio: 'ignore' });
+  await new Promise((resolve, reject) => {
+    desktop.once('spawn', resolve);
+    desktop.once('error', reject);
+  });
+  desktop.unref();
+  const deadline = Date.now() + 180000;
+  while (Date.now() < deadline) {
+    if (ready()) return;
+    await pause();
+  }
+  throw new Error('Docker Engine chua san sang. Kiem tra Docker Desktop roi chay lai lenh nay.');
+}
+
 async function healthy(base) {
   try {
     const response = await fetch(new URL('healthz', base + '/'), { signal: AbortSignal.timeout(5000) });
     return response.ok && (await response.json()).status === 'ok';
-  } catch { return false; }
+  } catch (error) {
+    if (error.cause?.code !== 'ENOTFOUND' || !base.endsWith('.trycloudflare.com')) return false;
+    // A local DNS server can cache NXDOMAIN while a new Quick Tunnel is being created.
+    try {
+      const resolver = new Resolver({ timeout: 3000, tries: 1 });
+      resolver.setServers(['1.1.1.1', '8.8.8.8']);
+      const [address] = await resolver.resolve4(new URL(base).hostname);
+      return await new Promise(resolve => {
+        const request = https.get(new URL('healthz', base + '/'), {
+          lookup: (_hostname, options, callback) => callback(null,
+            options.all ? [{ address, family: 4 }] : address, 4),
+        }, response => {
+          let body = '';
+          response.setEncoding('utf8');
+          response.on('data', chunk => { body += chunk; });
+          response.on('end', () => {
+            try { resolve(response.statusCode === 200 && JSON.parse(body).status === 'ok'); }
+            catch { resolve(false); }
+          });
+          response.on('error', () => resolve(false));
+        });
+        request.setTimeout(5000, () => request.destroy());
+        request.on('error', () => resolve(false));
+      });
+    } catch { return false; }
+  }
 }
 
 async function waitHealthy(base) {
@@ -91,6 +148,7 @@ async function main() {
     throw new Error('Can .env va tools/cloudflared.exe cua du an da thiet lap.');
   }
   fs.mkdirSync(temporaryDirectory, { recursive: true });
+  await ensureDocker();
   console.log('Khoi dong n8n...');
   docker(['up', '-d', 'n8n', 'image-tools'], { stdio: 'inherit' });
   await waitHealthy('http://localhost:5678');
@@ -115,9 +173,22 @@ async function main() {
     fs.writeFileSync(path.join(temporaryDirectory, 'telegram-startup-before.env'), env);
     if (existingTunnel) powershell(`Stop-Process -Id ${processId} -ErrorAction Stop`);
     console.log('Mo Cloudflare Tunnel...');
-    processId = powershell(
-      `$task = Start-Process -FilePath ${quote(tunnelExecutable)} -ArgumentList @('tunnel','--url','http://localhost:5678','--no-autoupdate') -WindowStyle Hidden -RedirectStandardError ${quote(tunnelLog)} -RedirectStandardOutput ${quote(path.join(temporaryDirectory, 'tunnel-startup-output.log'))} -PassThru; $task.Id`,
-    );
+    const output = fs.openSync(path.join(temporaryDirectory, 'tunnel-startup-output.log'), 'w');
+    const errorOutput = fs.openSync(tunnelLog, 'w');
+    try {
+      const tunnel = spawn(tunnelExecutable, ['tunnel', '--url', 'http://localhost:5678', '--no-autoupdate'], {
+        cwd: root, detached: true, windowsHide: true, stdio: ['ignore', output, errorOutput],
+      });
+      await new Promise((resolve, reject) => {
+        tunnel.once('spawn', resolve);
+        tunnel.once('error', reject);
+      });
+      processId = String(tunnel.pid);
+      tunnel.unref();
+    } finally {
+      fs.closeSync(output);
+      fs.closeSync(errorOutput);
+    }
     fs.writeFileSync(tunnelPidFile, processId);
     url = undefined;
     for (let attempt = 0; attempt < 60; attempt++) {
@@ -159,6 +230,8 @@ async function main() {
     await waitHealthy('http://localhost:5678');
   }
   await waitHealthy(url);
+  // Recreating n8n removes the workflow snapshot stored in the old container's /tmp.
+  docker(['exec', '-T', 'n8n', 'node', '-e', "require('fs').writeFileSync(process.argv[1],require('fs').readFileSync(0))", containerWorkflowFile], { input: JSON.stringify([workflow]) });
   docker(['exec', '-T', 'n8n', 'node', '-e', registerWebhook, containerWorkflowFile], { stdio: 'inherit' });
   console.log('Kiem tra link media cua cac bai da xep lich tren Buffer...');
   docker(['cp', 'scripts/repair-buffer-media.cjs', 'n8n:/tmp/repair-buffer-media.cjs']);

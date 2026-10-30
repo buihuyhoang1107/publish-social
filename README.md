@@ -44,7 +44,7 @@ Không cần import lại hay bấm Execute. Xem [menu V2](docs/TELEGRAM_MENU.md
 
 ## Chạy trên Windows
 
-Với instance Telegram hiện tại đã thiết lập, mở Docker Desktop rồi chạy:
+Với instance Telegram hiện tại đã thiết lập, chỉ cần chạy (script tự mở Docker Desktop nếu Engine chưa chạy):
 
 ```powershell
 node scripts/start-telegram.cjs

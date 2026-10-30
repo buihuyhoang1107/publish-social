@@ -4,7 +4,7 @@ const queueStore = (() => {
   const crypto = require('crypto');
   const file = '/files/telegram-content-queue.json';
   const lock = file + '.lock';
-  const labels = { draft: 'Chờ duyệt', approved: 'Đã duyệt, chờ xếp lịch', scheduling: 'Đang gửi lịch', scheduled: 'Đã lên lịch', partial: 'Một số kênh cần kiểm tra', sent: 'Đã đăng', attention: 'Cần kiểm tra', cancelled: 'Đã hủy' };
+  const labels = { batch: 'Đang gom, chưa xác nhận', draft: 'Chờ duyệt', approved: 'Đã duyệt, chờ xếp lịch', scheduling: 'Đang gửi lịch', scheduled: 'Đã lên lịch', partial: 'Một số kênh cần kiểm tra', sent: 'Đã đăng', attention: 'Cần kiểm tra', cancelled: 'Đã hủy' };
   const platforms = { tiktok: 'TikTok', facebook: 'Facebook', threads: 'Threads', instagram: 'Instagram' };
   const now = () => Date.now();
   const read = () => {
