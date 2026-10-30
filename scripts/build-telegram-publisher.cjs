@@ -4,7 +4,7 @@ const root = path.resolve(__dirname, '..');
 const config = JSON.parse(fs.readFileSync(path.join(root, 'temp/telegram-publisher-config.json'), 'utf8'));
 if (!config.allowedUserIds?.length || !config.allowedChatIds?.length || !config.services?.length) throw new Error('Cần allowlist Telegram và danh sách nền tảng.');
 const buffer = JSON.parse(fs.readFileSync(path.join(root, 'workflows/buffer-publisher.json'), 'utf8'));
-config.mediaWebhookId = buffer.nodes.find((item) => item.name === 'Video Download').webhookId;
+config.mediaWebhookId = buffer.nodes.find((item) => item.name === 'Media Download').webhookId;
 config.albumQuietMs ??= 3000;
 config.queue ??= { enabled: true, hours: [9, 14, 20], lowWatermark: 3, maxPendingPerChannel: 9 };
 if (config.queue.enabled && JSON.stringify(config.queue.hours) !== '[9,14,20]') throw new Error('Khung giờ được duyệt: 09:00, 14:00, 20:00 giờ Việt Nam.');
@@ -89,15 +89,15 @@ const nodes = [
   node('Has Verified Retry', 'if', 2.2, condition('hasVerifiedRetry')),
   node('Publish Queue Retry', 'httpRequest', 4.2, { ...http, jsonBody: `={{ { query: $json.retryKind === 'edit' ? 'mutation RetryPost($input: EditPostInput!) { editPost(input: $input) { __typename ... on PostActionSuccess { post { id status externalLink error { message } } } ... on MutationError { message } } }' : ${mutation}, variables: { input: $json.input } } }}` }, { onError: 'continueRegularOutput', retryOnFail: false }),
 ];
-for (const name of ['Video Download', 'Check Media Link', 'Read Video', 'Send Video']) nodes.push(structuredClone(buffer.nodes.find((item) => item.name === name)));
+for (const name of ['Media Download', 'Check Media Link', 'Read Media File', 'Serve Media File']) nodes.push(structuredClone(buffer.nodes.find((item) => item.name === name)));
 nodes.find((item) => item.name === 'Check Media Link').parameters.jsCode = code('telegram-publisher-media-request');
-Object.assign(nodes.find((item) => item.name === 'Video Download').parameters, { multipleMethods: true, httpMethod: ['GET', 'HEAD'] });
+Object.assign(nodes.find((item) => item.name === 'Media Download').parameters, { multipleMethods: true, httpMethod: ['GET', 'HEAD'] });
 const connections = {};
 const link = (from, to, output = 0) => { connections[from] ??= { main: [] }; connections[from].main[output] = [{ node: to, type: 'main', index: 0 }]; };
 for (const sequence of [
   ['Telegram Trigger', 'Telegram Intake', 'Is Album', 'Wait For Album', 'Collect Album', 'Album Ready', 'Should Publish', 'Resolve Post', 'Telegram Accepted', 'Expand Media', 'Download Each Media', 'Prepare Media', 'Store Media', 'Assemble Media', 'Read Buffer Account', 'Read Buffer Channels', 'Build Targets', 'Should Create Targets', 'Publish Channels', 'Parse Publish Result', 'Record Targets', 'Summarize Results', 'Still Processing', 'Wait For Buffer', 'Build Status Requests', 'Has Status Requests', 'Read Post Status', 'Parse Status Result', 'Record Targets'],
   ['Report Preparation Failure', 'Summarize Results'],
-  ['Video Download', 'Check Media Link', 'Read Video', 'Send Video'],
+  ['Media Download', 'Check Media Link', 'Read Media File', 'Serve Media File'],
 ]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
 link('Telegram Intake', 'Is Crop Request'); link('Is Crop Request', 'Download Crop Image'); link('Is Crop Request', 'Is Album', 1);
 for (const sequence of [['Download Crop Image', 'Crop Long Image', 'Prepare Crop Result', 'Has Crop Result', 'Send Crop Image', 'Record Crop Delivery', 'Telegram Reply']]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
@@ -108,7 +108,7 @@ link('Should Publish', 'Is Queue Command', 1); link('Is Queue Command', 'Has Que
 link('Has Queue Callback', 'Answer Queue Callback'); link('Has Queue Callback', 'Handle Queue Command', 1); link('Answer Queue Callback', 'Restore Queue Command'); link('Restore Queue Command', 'Handle Queue Command');
 link('Handle Queue Command', 'Telegram Reply'); link('Is Status Request', 'Build Status Requests'); link('Is Status Request', 'Telegram Reply', 1);
 link('Should Create Targets', 'Summarize Results', 1); link('Has Status Requests', 'Summarize Results', 1);
-link('Still Processing', 'Telegram Reply', 1); link('Video Download', 'Check Media Link', 1);
+link('Still Processing', 'Telegram Reply', 1); link('Media Download', 'Check Media Link', 1);
 for (const name of ['Prepare Media', 'Assemble Media']) link(name, 'Report Preparation Failure', 1);
 if (config.queue.enabled) link('Assemble Media', 'Save Content Draft');
 link('Save Content Draft', 'Telegram Reply'); link('Save Content Draft', 'Report Preparation Failure', 1);

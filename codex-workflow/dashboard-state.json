@@ -12,25 +12,29 @@
   "roles": {
     "implement": {
       "status": "done",
-      "action": "Đã gỡ bộ dựng/model và nhánh phim khỏi workflow đang chạy, giữ đăng bài tự động và cắt ảnh",
+      "action": "Đã đổi ba nhãn Video gây nhầm thành Media và publish, route file phục vụ đăng bài vẫn hoạt động",
       "phase": "handoff",
-      "updated_at": "2026-10-30T11:14:02+07:00",
-      "next": "Tiếp tục gửi nội dung qua Telegram để tự xếp lịch như trước",
+      "updated_at": "2026-10-30T11:22:28+07:00",
+      "next": "Người dùng refresh n8n để thấy nhãn mới, tiếp tục gửi nội dung đăng bài",
       "files": [
+        "scripts/build-buffer-workflow.cjs",
         "scripts/build-telegram-publisher.cjs",
-        "scripts/start-telegram.cjs",
-        "workflows/code/telegram-album-intake.js",
         "workflows/telegram-publisher.json"
       ],
       "checks": [
         {
           "status": "PASS",
-          "label": "Crop routing, queue retry, content queue, syntax và live75nodes không nhánh phim, public health200"
+          "label": "Live75nodes không nhãn Film/Video, GET PNG nguyên byte/MIME và HEAD200, media repair test; không đăng thử"
         }
       ]
     }
   },
   "events": [
+    {
+      "at": "2026-10-30T11:22:28+07:00",
+      "role": "implement",
+      "message": "Đã đổi ba nhãn Video gây nhầm thành Media và publish, route file phục vụ đăng bài vẫn hoạt động"
+    },
     {
       "at": "2026-10-30T11:14:03+07:00",
       "role": "lead",
@@ -47,5 +51,5 @@
       "message": "Nhiệm vụ: Gỡ chức năng tạo phim (working)"
     }
   ],
-  "updated_at": "2026-10-30T11:14:03+07:00"
+  "updated_at": "2026-10-30T11:22:28+07:00"
 }

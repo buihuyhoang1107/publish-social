@@ -55,7 +55,7 @@ async function main() {
   const [workflow] = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
   const http = workflow.nodes.find(node => node.name === 'Queue Account');
   const config = JSON.parse(workflow.nodes.find(node => node.name === 'Start Queue Worker').parameters.jsCode.match(/^const publisherConfig = (.+);\r?\n/)[1]);
-  const mediaWebhookId = workflow.nodes.find(node => node.name === 'Video Download').webhookId;
+  const mediaWebhookId = workflow.nodes.find(node => node.name === 'Media Download').webhookId;
   const credentialFile = '/tmp/buffer-media-credential-' + process.pid + '.json';
   let credential;
   try {

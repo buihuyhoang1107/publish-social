@@ -27,7 +27,7 @@ if (process.argv.includes('--prepare')) {
       node.parameters = { jsCode: `const fs = require('fs'); const json = $input.first().json; fs.appendFileSync('/files/queue-runtime-replies.jsonl', JSON.stringify({ ...json, notification: ${notification} }) + String.fromCharCode(10)); return [{ json: ${notification ? '{ ok: true }' : 'json'} }];` };
     }
     if (node.type === 'n8n-nodes-base.httpRequest') { node.parameters.authentication = 'none'; delete node.parameters.genericAuthType; node.parameters.url = 'http://127.0.0.1:5681/graphql'; }
-    if (node.name === 'Video Download') node.webhookId = config.mediaWebhookId;
+    if (node.name === 'Media Download') node.webhookId = config.mediaWebhookId;
     if (node.name === 'Wait For Buffer') node.parameters.amount = 1;
   }
   fs.writeFileSync(path.join(root, 'temp/telegram-publisher-test/queue-workflow.json'), JSON.stringify(workflow, null, 2));

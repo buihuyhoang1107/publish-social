@@ -274,7 +274,7 @@
     },
     {
       "id": "video-download",
-      "name": "Video Download",
+      "name": "Media Download",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "position": [
@@ -304,7 +304,7 @@
     },
     {
       "id": "read-video",
-      "name": "Read Video",
+      "name": "Read Media File",
       "type": "n8n-nodes-base.readWriteFile",
       "typeVersion": 1.1,
       "position": [
@@ -322,7 +322,7 @@
     },
     {
       "id": "send-video",
-      "name": "Send Video",
+      "name": "Serve Media File",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.4,
       "position": [
@@ -428,7 +428,7 @@
         ]
       ]
     },
-    "Video Download": {
+    "Media Download": {
       "main": [
         [
           {
@@ -443,18 +443,18 @@
       "main": [
         [
           {
-            "node": "Read Video",
+            "node": "Read Media File",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Read Video": {
+    "Read Media File": {
       "main": [
         [
           {
-            "node": "Send Video",
+            "node": "Serve Media File",
             "type": "main",
             "index": 0
           }

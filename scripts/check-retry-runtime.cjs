@@ -29,7 +29,7 @@ if (process.argv.includes('--prepare')) {
       node.parameters = { httpMethod: 'POST', path: 'retry-check', responseMode: 'onReceived', options: {} }; node.webhookId = 'retry-check';
     }
     if (node.name === 'Telegram Intake') node.parameters.jsCode = node.parameters.jsCode.replace('$input.first().json;', '$input.first().json.body;');
-    if (['Queue Schedule', 'Video Download'].includes(node.name)) node.disabled = true;
+    if (['Queue Schedule', 'Media Download'].includes(node.name)) node.disabled = true;
     if (node.type === 'n8n-nodes-base.telegram') {
       node.type = 'n8n-nodes-base.code'; node.typeVersion = 2;
       node.parameters = { jsCode: "const fs=require('fs'); fs.appendFileSync('" + files + "/replies.jsonl',JSON.stringify($input.first().json)+'\\n'); return $input.all();" };

@@ -12,7 +12,7 @@ if (process.argv.includes('--prepare')) {
     const text = vm.runInNewContext('(' + accepted.slice(3, -2) + ')', { $json: { caption: '💌'.repeat(length) } });
     assert.equal(text.includes('Bot sẽ bỏ qua Threads'), length > 499, 'Warn at receipt time before the publish route');
   }
-  const config = { allowedUserIds: [456], allowedChatIds: [456], services, albumQuietMs: 3000, publicBaseUrl: 'http://127.0.0.1:5678', mediaWebhookId: w.nodes.find(n => n.name === 'Video Download').webhookId };
+  const config = { allowedUserIds: [456], allowedChatIds: [456], services, albumQuietMs: 3000, publicBaseUrl: 'http://127.0.0.1:5678', mediaWebhookId: w.nodes.find(n => n.name === 'Media Download').webhookId };
   w.id = 'telegramPublisherTest'; w.versionId = require('node:crypto').randomUUID(); w.name = 'Telegram Multi Publisher Isolated Test';
   w.nodes.find(n => n.name === 'Queue Schedule').disabled = true;
   w.connections['Assemble Media'] = { main: [[{ node: 'Read Buffer Account', type: 'main', index: 0 }], w.connections['Assemble Media'].main[1]] };

@@ -9,7 +9,7 @@ if (process.argv.includes('--prepare')) {
   for (const name of ['result.jpg', 'result.png', 'parts.zip', 'deliveries.jsonl', 'replies.jsonl', 'telegram-crop-456-2.json', 'telegram-crop-456-4.json', 'telegram-crop-456-6.json']) if (fs.existsSync(files + '/' + name)) fs.unlinkSync(files + '/' + name);
   const workflow = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
   workflow.id = 'cropRuntime'; workflow.versionId = crypto.randomUUID(); workflow.name = 'Crop isolated runtime';
-  const config = { allowedUserIds: [456], allowedChatIds: [456], services: ['facebook'], publicBaseUrl: 'http://127.0.0.1:5680', mediaWebhookId: workflow.nodes.find(node => node.name === 'Video Download').webhookId, queue: { enabled: true, hours: [9, 14, 20], lowWatermark: 3, maxPendingPerChannel: 9 } };
+  const config = { allowedUserIds: [456], allowedChatIds: [456], services: ['facebook'], publicBaseUrl: 'http://127.0.0.1:5680', mediaWebhookId: workflow.nodes.find(node => node.name === 'Media Download').webhookId, queue: { enabled: true, hours: [9, 14, 20], lowWatermark: 3, maxPendingPerChannel: 9 } };
   for (const node of workflow.nodes) {
     assert.equal(node.credentials, undefined);
     if (node.parameters.jsCode?.startsWith('const publisherConfig = ')) node.parameters.jsCode = node.parameters.jsCode.replace(/^const publisherConfig = .*;\r?\n/, () => 'const publisherConfig = ' + JSON.stringify(config) + ';\n');

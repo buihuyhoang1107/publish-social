@@ -51,13 +51,13 @@ w.nodes.push(
     jsonBody: `={{ { query: ${JSON.stringify(`query PostStatus($input: PostInput!) { post(input: $input) { ${postFields} } }`)}, variables: { input: { id: $json.postId } } } }}`,
   }),
   node('Show Result', 'form', 2.5, [1440, 400], { operation: 'completion', respondWith: 'text', completionTitle: 'Kết quả đăng TikTok', completionMessage: '={{ $json.formMessage }}', options: {} }),
-  node('Video Download', 'webhook', 2, [0, 700], { httpMethod: 'GET', path: 'buffer-media/:fileName', responseMode: 'responseNode', options: {} }, { webhookId: '72b6fa94-2772-4442-bd42-5b4d07e37206' }),
+  node('Media Download', 'webhook', 2, [0, 700], { httpMethod: 'GET', path: 'buffer-media/:fileName', responseMode: 'responseNode', options: {} }, { id: 'video-download', webhookId: '72b6fa94-2772-4442-bd42-5b4d07e37206' }),
   node('Check Media Link', 'code', 2, [240, 700], { jsCode: code('buffer-media-request') }),
-  node('Read Video', 'readWriteFile', 1.1, [480, 700], { operation: 'read', fileSelector: '={{ $json.localFile }}', options: { dataPropertyName: 'data', mimeType: '={{ $json.mimeType }}' } }),
-  node('Send Video', 'respondToWebhook', 1.4, [720, 700], {
+  node('Read Media File', 'readWriteFile', 1.1, [480, 700], { operation: 'read', fileSelector: '={{ $json.localFile }}', options: { dataPropertyName: 'data', mimeType: '={{ $json.mimeType }}' } }, { id: 'read-video' }),
+  node('Serve Media File', 'respondToWebhook', 1.4, [720, 700], {
     respondWith: 'binary', responseDataSource: 'set', inputFieldName: 'data',
     options: { responseHeaders: { entries: [{ name: 'Cache-Control', value: 'private, no-store' }, { name: 'Content-Disposition', value: 'inline; filename="video"' }] } },
-  }),
+  }, { id: 'send-video' }),
 );
 const link = (from, to, output = 0) => {
   w.connections[from] ??= { main: [] };
@@ -65,7 +65,7 @@ const link = (from, to, output = 0) => {
 };
 for (const sequence of [
   ['Upload Video', 'Prepare Video', 'Store Video', 'Publish TikTok', 'Publish Result', 'Still Processing'],
-  ['Video Download', 'Check Media Link', 'Read Video', 'Send Video'],
+  ['Media Download', 'Check Media Link', 'Read Media File', 'Serve Media File'],
   ['Wait For Buffer', 'Read Post Status', 'Publish Result'],
 ]) for (let i = 0; i < sequence.length - 1; i++) link(sequence[i], sequence[i + 1]);
 link('Still Processing', 'Wait For Buffer'); link('Still Processing', 'Show Result', 1);
