@@ -1,10 +1,13 @@
 const http = require('node:http');
 const { cropLongImage } = require('./crop.cjs');
+const { handleTelegramDownload, handleTelegramReply } = require('./telegram-download.cjs');
 const maxBytes = 20 * 1024 * 1024;
 let processing = false;
 
 const server = http.createServer(async (request, response) => {
   if (request.method === 'GET' && request.url === '/healthz') { response.end('{"status":"ok"}'); return; }
+  if (await handleTelegramDownload(request, response)) return;
+  if (await handleTelegramReply(request, response)) return;
   const url = new URL(request.url, 'http://image-tools');
   if (request.method !== 'POST' || url.pathname !== '/crop') { response.writeHead(404).end(); return; }
   if (processing) { response.writeHead(429, { 'content-type': 'application/json', 'retry-after': '3' }).end(JSON.stringify({ message: 'Bot đang xử lý ảnh khác, thử lại sau ít giây.' })); return; }

@@ -30,7 +30,7 @@ const sandbox = (json, work, prepared) => ({ require: name => name === 'fs' ? fa
   $input: { first: () => ({ json }), all: () => json },
   $: name => ({ isExecuted: false, first: () => ({ json: {} }), itemMatching: () => ({ json: name === 'Prepare Queue Retry' ? prepared : work }) }),
 });
-const run = (name, json, work) => JSON.parse(JSON.stringify(vm.runInNewContext('(()=>{ const publisherConfig=' + JSON.stringify(config) + ';\n' + helper + '\n' + (name === 'telegram-album-intake' ? source('telegram-image-crop-intake') + '\n' : '') + source(name) + '\n})()', sandbox(json, work))));
+const run = (name, json, work) => JSON.parse(JSON.stringify(vm.runInNewContext('(()=>{ const publisherConfig=' + JSON.stringify(config) + ';\n' + helper + '\n' + (name === 'telegram-album-intake' ? source('telegram-image-crop-intake') + '\n' + source('telegram-list-import-intake') + '\n' : '') + source(name) + '\n})()', sandbox(json, work))));
 const verify = async (prepared, inputBuffers = buffers) => JSON.parse(JSON.stringify(await vm.runInNewContext('(async function(){ const publisherConfig=' + JSON.stringify(config) + ';\n' + helper + '\n' + source('telegram-queue-verify-retry') + '\n}).call({helpers:{getBinaryDataBuffer:async index=>testBuffers[index]}})', { ...sandbox(inputBuffers.map(() => ({ json: {}, binary: { data: {} } })), undefined, prepared), testBuffers: inputBuffers })));
 const callback = (id, user = 456) => ({ callback_query: { id, from: { id: user }, data: 'queue_retry:110', message: { message_id: 999, chat: { id: 456, type: 'private' } } } });
 const next = () => {

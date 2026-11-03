@@ -3,6 +3,10 @@
 Lịch đã chọn: **09:00, 14:00 và 20:00 hằng ngày, giờ Việt Nam (UTC+7)**.
 Workflow vẫn dùng bot Telegram hiện tại, n8n và Buffer; không tự sinh nội dung.
 
+Nhập riêng một danh sách content và một nhóm ảnh bằng `/import`:
+xem [hướng dẫn nhập danh sách](TELEGRAM_LIST_IMPORT.md). Bot ghép theo mã/tên
+file, cho xem trước và chỉ xếp lịch sau khi xác nhận.
+
 ## Sử dụng qua Telegram
 
 1. Gửi một ảnh, album tối đa 10 ảnh hoặc một video kèm caption. Bot tải đủ media,

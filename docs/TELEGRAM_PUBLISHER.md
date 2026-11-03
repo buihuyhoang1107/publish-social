@@ -88,6 +88,14 @@ Builder: `node scripts/build-telegram-publisher.cjs`. Config local:
 albumQuietMs, publicBaseUrl). Builder dùng node API/media từ `workflows/buffer-publisher.json`.
 File deploy gán credential hiện có và **versionId mới** trước khi import/publish.
 
+Riêng `Download Crop Image` dùng credential Telegram riêng, cùng bot token nhưng
+Base URL là `http://image-tools:3000/telegram-download`. Không đổi Base URL của
+credential dùng cho Trigger hoặc gửi tin. Gateway nội bộ chỉ cho phép `getFile`
+và tải ảnh, dùng HTTPS IPv4 có giới hạn 15 giây cho metadata, 90 giây cho file
+và tối đa 20 MB. Node tải thử tối đa 2 lần; `Has Crop Source` chuyển lỗi tải thẳng
+đến thông báo lỗi và ghi receipt `failed`, không gọi dịch vụ cắt khi chưa có ảnh.
+Khi deploy lại từ builder, phải giữ credential riêng này cho `Download Crop Image`.
+
 `scripts/check-telegram-publisher.cjs` chạy trên n8n riêng cổng loopback 5680,
 mock API cổng 5681, không có credential và không đăng bài thật. `--prepare` tạo
 fixture trong `temp/telegram-publisher-test`; import/publish ID

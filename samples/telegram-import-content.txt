@@ -1,0 +1,6 @@
+[POST01]
+Thay dòng này bằng caption hoàn chỉnh của bài POST01, gồm emoji và hashtag.
+
+[POST02]
+Thay dòng này bằng caption hoàn chỉnh của bài POST02.
+Có thể xuống dòng trong cùng một caption.

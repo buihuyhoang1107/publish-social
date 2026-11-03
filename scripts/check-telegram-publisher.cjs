@@ -22,7 +22,7 @@ if (process.argv.includes('--prepare')) {
   trigger.parameters = { httpMethod: 'POST', path: 'telegram-publisher-check', responseMode: 'lastNode', options: {} };
   for (const [name, source] of [['Telegram Intake', 'telegram-album-intake'], ['Collect Album', 'telegram-album-collect'], ['Prepare Media', 'telegram-multi-prepare'], ['Build Targets', 'telegram-multi-targets']]) {
     let code = fs.readFileSync(path.join(root, 'workflows/code/' + source + '.js'), 'utf8');
-    if (name === 'Telegram Intake') code = fs.readFileSync(path.join(root, 'workflows/code/telegram-queue-store.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'workflows/code/telegram-image-crop-intake.js'), 'utf8') + '\n' + code;
+    if (name === 'Telegram Intake') code = fs.readFileSync(path.join(root, 'workflows/code/telegram-queue-store.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'workflows/code/telegram-image-crop-intake.js'), 'utf8') + '\n' + fs.readFileSync(path.join(root, 'workflows/code/telegram-list-import-intake.js'), 'utf8') + '\n' + code;
     if (name === 'Telegram Intake') code = code.replace('$input.first().json;', '$input.first().json.body;');
     w.nodes.find(n => n.name === name).parameters.jsCode = 'const publisherConfig = ' + JSON.stringify(config) + ';\n' + code;
   }

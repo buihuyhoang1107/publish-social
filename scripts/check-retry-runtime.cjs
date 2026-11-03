@@ -30,7 +30,7 @@ if (process.argv.includes('--prepare')) {
     }
     if (node.name === 'Telegram Intake') node.parameters.jsCode = node.parameters.jsCode.replace('$input.first().json;', '$input.first().json.body;');
     if (['Queue Schedule', 'Media Download'].includes(node.name)) node.disabled = true;
-    if (node.type === 'n8n-nodes-base.telegram') {
+    if (node.type === 'n8n-nodes-base.telegram' || ['Telegram Reply', 'Queue Notification'].includes(node.name)) {
       node.type = 'n8n-nodes-base.code'; node.typeVersion = 2;
       node.parameters = { jsCode: "const fs=require('fs'); fs.appendFileSync('" + files + "/replies.jsonl',JSON.stringify($input.first().json)+'\\n'); return $input.all();" };
     }

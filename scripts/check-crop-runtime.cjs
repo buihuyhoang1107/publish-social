@@ -20,10 +20,11 @@ if (process.argv.includes('--prepare')) {
     }
     if (node.name === 'Telegram Intake') node.parameters.jsCode = node.parameters.jsCode.replace('$input.first().json;', '$input.first().json.body;');
     if (node.name === 'Queue Schedule') node.disabled = true;
-    if (node.type === 'n8n-nodes-base.telegram') {
+    if (node.type === 'n8n-nodes-base.telegram' || node.name === 'Telegram Reply') {
       node.type = 'n8n-nodes-base.code'; node.typeVersion = 2;
       if (node.name === 'Download Crop Image') node.parameters = { jsCode: "const fs=require('fs'); return [{json:{},binary:{data:await this.helpers.prepareBinaryData(fs.readFileSync('" + files + "/source.jpg'),'source.jpg','image/jpeg')}}];" };
       else if (node.name === 'Send Crop Image') node.parameters = { jsCode: "const fs=require('fs');const item=$input.first();const bytes=await this.helpers.getBinaryDataBuffer(0,'data');const file=item.json.cropOutput==='parts'?'parts.zip':item.json.cropOutput==='png'?'result.png':'result.jpg';fs.writeFileSync('" + files + "/'+file,bytes);fs.appendFileSync('" + files + "/deliveries.jsonl',JSON.stringify({file,url:item.json.cropDownloadUrl,name:item.binary.data.fileName})+'\\n');return [{json:{ok:true,result:{message_id:999,document:{file_id:'test-crop'}}}}];" };
+      else if (node.name === 'Crop Accepted') node.parameters = { jsCode: "return [{json:{ok:true,result:{message_id:998}}}];" };
       else if (node.name === 'Telegram Reply') node.parameters = { jsCode: "require('fs').appendFileSync('" + files + "/replies.jsonl',JSON.stringify($input.first().json)+'\\n');return $input.all();" };
       else node.parameters = { jsCode: "throw new Error('Crop reached unexpected publishing/Telegram node');" };
     }

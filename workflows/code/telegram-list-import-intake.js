@@ -1,0 +1,30 @@
+const handleListImportMessage = (message, context) => {
+  if (!publisherConfig.queue?.enabled) return;
+  const key = context.chatId + ':' + context.ownerId;
+  const state = queueStore.read();
+  const batch = state.batches?.[state.batchSessions?.[key]];
+  if (!batch?.importMode || batch.status !== 'collecting') return;
+  const reply = text => [{ json: { ...context, text } }];
+  if (message.text?.startsWith('/')) return;
+  if (message.text) return [{ json: { ...context, queueCommand: true, commandText: '/import content', importText: message.text } }];
+  if (message.photo) return reply('Hãy gửi ảnh bằng Đính kèm → File/Tài liệu và giữ tên POST01.png, POST02.png… để bot ghép đúng bài. Không gửi dạng Ảnh vì Telegram không giữ tên file.');
+  const file = message.document ?? message.video;
+  if (message.video && !file.file_name) return reply('Video cần có tên file để ghép đúng content. Hãy gửi dạng File/Tài liệu, ví dụ POST01.mp4; hoặc ghi đúng tên video trong bảng content.');
+  if (!file || !/\.(txt|png|jpe?g|webp|mp4|mov|webm)$/i.test(file.file_name ?? '')) return reply('Đợt nhập nhận TXT UTF-8, ảnh JPG/PNG/WEBP và video MP4/MOV/WEBM. Giữ tên file để ghép content; /import preview để kiểm tra hoặc /import cancel để hủy.');
+  const textFile = /\.txt$/i.test(file.file_name);
+  if (file.file_size > (textFile ? 1024 * 1024 : 20 * 1024 * 1024)) return reply(textFile ? 'File danh sách vượt 1 MB. Hãy chia nhỏ hoặc gửi các phần nội dung bằng tin nhắn.' : 'File ảnh/video vượt 20 MB. Hãy giảm dung lượng rồi gửi lại.');
+  if (!/^[^/\\\x00-\x1f]+$/.test(file.file_name) || file.file_name.length > 180) return reply('Tên file không hợp lệ. Hãy đổi thành tên đơn giản như POST01.png hoặc content.txt.');
+  const claim = queueStore.transact(current => {
+    const active = current.batches?.[batch.id];
+    if (!active || active.status !== 'collecting' || current.batchSessions?.[key] !== batch.id) return { closed: true };
+    if (active.importReceipts[context.messageId]) return { duplicate: true };
+    if (Object.keys(active.importReceipts).length >= 3000) return { full: true };
+    active.importReceipts[context.messageId] = { status: 'processing', fileName: file.file_name, startedAt: new Date().toISOString() };
+    delete active.preview;
+    return { claimed: true };
+  });
+  if (claim.duplicate) return [];
+  if (claim.busy) return reply('Kho đang cập nhật. Gửi lại file sau ít giây.');
+  if (claim.closed || claim.full) return reply('Đợt đã đóng hoặc đủ số file. /import preview để kiểm tra; /import cancel để hủy.');
+  return [{ json: { ...context, isImportFileRequest: true, fileId: file.file_id, importBatchId: batch.id, importFileName: file.file_name, importKind: textFile ? 'text' : /\.(mp4|mov|webm)$/i.test(file.file_name) ? 'video' : 'image' } }];
+};

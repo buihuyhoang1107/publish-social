@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "start": "node server.cjs",
-    "test": "node --test image-tools.test.cjs"
+    "test": "node --test image-tools.test.cjs telegram-download.test.cjs"
   },
   "dependencies": {
     "fflate": "0.8.3",

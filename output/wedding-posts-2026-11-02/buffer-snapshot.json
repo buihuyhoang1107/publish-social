@@ -1,0 +1,58 @@
+{
+  "checkedAt": "2026-11-02T05:51:07.915Z",
+  "channels": [
+    {
+      "id": "6ae061c02f1f5ed648e798cf",
+      "name": "bhhoang_1107",
+      "service": "threads",
+      "isDisconnected": false,
+      "isLocked": false
+    },
+    {
+      "id": "6ae060c32f1f5ed648e7923f",
+      "name": "Thiệp online Trọng Hoàng",
+      "service": "facebook",
+      "isDisconnected": false,
+      "isLocked": false
+    },
+    {
+      "id": "6ae04e2c2f1f5ed648e6e5cc",
+      "name": "thieponline.org",
+      "service": "tiktok",
+      "isDisconnected": false,
+      "isLocked": false
+    }
+  ],
+  "pending": [
+    {
+      "id": "6ae7fb8305377798e051dc14",
+      "channelId": "6ae061c02f1f5ed648e798cf",
+      "dueAt": "2026-11-02T13:00:00.000Z"
+    },
+    {
+      "id": "6ae7fb8222752db9a6fb8966",
+      "channelId": "6ae060c32f1f5ed648e7923f",
+      "dueAt": "2026-11-02T13:00:00.000Z"
+    },
+    {
+      "id": "6ae7fb81386eccf91256487b",
+      "channelId": "6ae04e2c2f1f5ed648e6e5cc",
+      "dueAt": "2026-11-02T13:00:00.000Z"
+    },
+    {
+      "id": "6ae7f9b4386eccf912556dc8",
+      "channelId": "6ae061c02f1f5ed648e798cf",
+      "dueAt": "2026-11-02T07:00:00.000Z"
+    },
+    {
+      "id": "6ae7f9b305377798e05104d5",
+      "channelId": "6ae060c32f1f5ed648e7923f",
+      "dueAt": "2026-11-02T07:00:00.000Z"
+    },
+    {
+      "id": "6ae7f9b1ab5edfbf4a4dd6bb",
+      "channelId": "6ae04e2c2f1f5ed648e6e5cc",
+      "dueAt": "2026-11-02T07:00:00.000Z"
+    }
+  ]
+}

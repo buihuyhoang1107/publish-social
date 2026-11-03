@@ -1,7 +1,7 @@
 const bulkPlanTools = (() => {
   const owner = context => context.ownerId ?? context.chatId;
   const key = context => context.chatId + ':' + owner(context);
-  const postsFor = (state, batch) => state.posts.filter(post => post.chatId === batch.chatId && post.batchId === batch.id && post.status === 'batch').sort((a, b) => a.messageId - b.messageId);
+  const postsFor = (state, batch) => state.posts.filter(post => post.chatId === batch.chatId && post.batchId === batch.id && post.status === 'batch').sort((a, b) => (a.importOrder ?? a.messageId) - (b.importOrder ?? b.messageId));
   const pending = batch => queueStore.fs.readdirSync('/files').filter(name => name.startsWith(`telegram-post-${batch.chatId}-`) && name.endsWith('.json')).reduce((count, name) => {
     const record = JSON.parse(queueStore.fs.readFileSync('/files/' + name, 'utf8'));
     return count + Number(record.batchId === batch.id && ['received', 'collecting'].includes(record.status));
@@ -20,6 +20,10 @@ const bulkPlanTools = (() => {
     return result.length === posts.length ? result : undefined;
   };
   const preview = (state, batch, pageInput = '1') => {
+    if (batch.importMode) {
+      const readiness = listImportTools.prepare(state, batch);
+      if (readiness) return readiness;
+    }
     const posts = postsFor(state, batch);
     const inflight = pending(batch);
     const button = calendarTools.button;
@@ -34,7 +38,7 @@ const bulkPlanTools = (() => {
     const caption = new Map(posts.map(post => [post.id, post]));
     const text = `📦 Xem trước ${posts.length} bài · giờ Việt Nam\nTừ ${queueStore.formatTime(planned[0].dueAt)}\nĐến ${queueStore.formatTime(planned[planned.length - 1].dueAt)}\nKhung: 09:00, 14:00, 20:00; bỏ qua chỗ đã có bài.\nKênh: ${publisherConfig.services.map(service => queueStore.platforms[service]).join(', ')}.\nChưa gửi bài của đợt này sang Buffer.\n\n` + visible.map(item => {
       const post = caption.get(item.postId);
-      return `#${post.messageId} · ${queueStore.formatTime(item.dueAt)}\n${Array.from(post.caption).slice(0, 70).join('')}`;
+      return `${post.importCode ? post.importCode + ' · ' + post.importFileName + '\n' : ''}#${post.messageId} · ${queueStore.formatTime(item.dueAt)}\n${Array.from(post.caption).slice(0, 70).join('')}${publisherConfig.services.includes('threads') && Array.from(post.caption).length > 499 ? '\n⚠ Threads vượt 499 ký tự, sẽ bỏ qua.' : ''}`;
     }).join('\n\n') + `\n\nTrang ${page}/${totalPages}. Chọn Xác nhận để giữ lịch cho toàn đợt. Lịch phát sinh ngoài bot trên Buffer sẽ được kiểm tra lại khi gửi từng bài.`;
     return { text, calendarKeyboard: calendarTools.keyboard([
       [button('‹ Bài trước', `batch:preview:${batch.id}:${Math.max(1, page - 1)}`), button('Bài tiếp ›', `batch:preview:${batch.id}:${Math.min(totalPages, page + 1)}`)],
@@ -68,6 +72,10 @@ const bulkPlanTools = (() => {
       return { text: 'Đã hủy đợt gom bài. Không gửi bài của đợt này lên Buffer. Đã thoát chế độ gom; bài gửi tiếp theo sẽ tự xếp lịch theo luồng bình thường.' };
     }
     if (action === 'confirm') {
+      if (batch.importMode) {
+        const readiness = listImportTools.prepare(state, batch);
+        if (readiness) return readiness;
+      }
       const posts = postsFor(state, batch);
       if (!posts.length || pending(batch)) return preview(state, batch);
       const planned = proposal(state, batch, posts);

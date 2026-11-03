@@ -1,0 +1,155 @@
+{
+  "id": "wedding-posts-2026-11-02",
+  "status": "scheduled",
+  "posts": [
+    {
+      "code": "POST01",
+      "fileName": "POST01.png",
+      "topic": "Thiệp cưới online chạm cảm xúc đầu tiên",
+      "caption": "💌 Một lời mời đẹp đôi khi chính là cảm xúc đầu tiên khách mời nhận được trước ngày cưới. Thiệp cưới online giúp câu chuyện của hai bạn được gửi đi tinh tế và dễ dàng hơn. Nếu bạn là studio, wedding planner, đơn vị thiệp cưới, trang trí hay quà tặng, cùng kết nối để tạo thêm giá trị cho khách hàng nhé! #thiepcuoi #weddingpartner #thieponlineorg",
+      "width": 1254,
+      "height": 1254,
+      "characterCount": 345,
+      "hashtags": [
+        "#thiepcuoi",
+        "#weddingpartner",
+        "#thieponlineorg"
+      ],
+      "sha256": "50d5ae27e72e9ec6d72fea9b3067a116ed00a33c808014396043bd41f0903bbd",
+      "proposedDueAt": "2026-11-03T02:00:00.000Z",
+      "proposedLocalTime": "2026-11-03 09:00",
+      "mediaName": "queue_a594e280da6f29f83c030a32cdef2a7a.png",
+      "fingerprint": "6ac0ff25d8ff1757788318a0006f0f45e9280df00e4e141ccae92f1b39cc01f0",
+      "telegram": {
+        "status": "sent",
+        "messageId": 485,
+        "fileId": "BQACAgUAAxkDAAIB5WroJx4rqPeVvRhmzg-XvpV_ZpoQAAJfHgACZuZAV1CXQlQSKbXRPQQ",
+        "completedAt": "2026-11-02T06:01:02.354Z"
+      },
+      "queuePostId": "6729441444:485"
+    },
+    {
+      "code": "POST02",
+      "fileName": "POST02.png",
+      "topic": "Ảnh cưới đẹp nhất là ảnh có cảm xúc",
+      "caption": "📸 Ảnh cưới đẹp nhất không nhất thiết phải cầu kỳ, mà là khi hai người thật sự vui và là chính mình. Những khoảnh khắc tự nhiên luôn có sức sống rất lâu. Studio, wedding planner hay đơn vị cưới hỏi muốn kết hợp thêm giải pháp thiệp online cho khách hàng có thể nhắn tin kết nối nhé! #anhcuoi #weddingstudio #thieponlineorg",
+      "width": 1254,
+      "height": 1254,
+      "characterCount": 321,
+      "hashtags": [
+        "#anhcuoi",
+        "#weddingstudio",
+        "#thieponlineorg"
+      ],
+      "sha256": "ca664ab05d026e1693d762e93f9dc4643d7b27d7bad5feecb9cf16f84f8dea1f",
+      "proposedDueAt": "2026-11-03T07:00:00.000Z",
+      "proposedLocalTime": "2026-11-03 14:00",
+      "mediaName": "queue_b11b27b2793eca121b245a5697d091cc.png",
+      "fingerprint": "8ae0ed05b6a0a3f3c6c41e9866c79d848e8dfc9babb948d0ee93bafe7ececeba",
+      "telegram": {
+        "status": "sent",
+        "messageId": 486,
+        "fileId": "BQACAgUAAxkDAAIB5mroJyb2TK4lF-ZoCCPNWRLXAx-qAAJgHgACZuZAV_cKpVAM20N2PQQ",
+        "completedAt": "2026-11-02T06:01:10.180Z"
+      },
+      "queuePostId": "6729441444:486"
+    },
+    {
+      "code": "POST03",
+      "fileName": "POST03.png",
+      "topic": "Đám cưới nhỏ vẫn đủ đầy hạnh phúc",
+      "caption": "🤍 Đám cưới nhỏ không có nghĩa là ít cảm xúc. Đôi khi chỉ cần những người thật sự quan trọng, một không gian ấm áp và những khoảnh khắc chân thành là đã đủ để nhớ rất lâu. Các đơn vị cưới hỏi, trang trí, sự kiện hay quà tặng muốn cùng tạo trải nghiệm trọn vẹn hơn, hãy kết nối nhé! #damcuoi #weddingideas #thieponlineorg",
+      "width": 1254,
+      "height": 1254,
+      "characterCount": 319,
+      "hashtags": [
+        "#damcuoi",
+        "#weddingideas",
+        "#thieponlineorg"
+      ],
+      "sha256": "e4e4a45f120777a5145311412b794bc65c9a3fa2cea0a3f95deb5e8eb5b746a6",
+      "proposedDueAt": "2026-11-03T13:00:00.000Z",
+      "proposedLocalTime": "2026-11-03 20:00",
+      "mediaName": "queue_54ed0980b182c2020c667eb83dc5042c.png",
+      "fingerprint": "f517bc461b14dc2d9007c561acd64acdc6df5ee2dda989d2fe97ffaf702e4d3e",
+      "telegram": {
+        "status": "sent",
+        "messageId": 487,
+        "fileId": "BQACAgUAAxkDAAIB52roJy_OdGTdTpVz9Xl50P8ENljbAAJhHgACZuZAV0yal5DJpvXkPQQ",
+        "completedAt": "2026-11-02T06:01:19.784Z"
+      },
+      "queuePostId": "6729441444:487"
+    },
+    {
+      "code": "POST04",
+      "fileName": "POST04.png",
+      "topic": "Những chi tiết nhỏ làm nên ngày cưới đáng nhớ",
+      "caption": "✨ Ngày cưới được nhớ lâu thường nhờ những chi tiết rất nhỏ: một lời mời tinh tế, bàn tiệc chỉn chu, ánh sáng đẹp hay món quà cảm ơn đầy ý nghĩa. Nếu bạn đang làm thiệp cưới, studio, wedding planner, trang trí tiệc hoặc sự kiện, cùng kết nối để tạo thêm những điểm chạm đáng nhớ nhé! #weddingdetail #cuoihoi #thieponlineorg",
+      "width": 1254,
+      "height": 1254,
+      "characterCount": 322,
+      "hashtags": [
+        "#weddingdetail",
+        "#cuoihoi",
+        "#thieponlineorg"
+      ],
+      "sha256": "ef7afd8e1f808271dc1034bf16dcd5cea12a6b21330f5786dbbc1fed697e2dc8",
+      "proposedDueAt": "2026-11-04T02:00:00.000Z",
+      "proposedLocalTime": "2026-11-04 09:00",
+      "mediaName": "queue_3027803f2ad90eca713ff005ef4b9c34.png",
+      "fingerprint": "457fe27d4417318314c5eda9331f0c149a12947bc4376f6dd64c386942f71d99",
+      "telegram": {
+        "status": "sent",
+        "messageId": 488,
+        "fileId": "BQACAgUAAxkDAAIB6GroJzhPLrojKan7tVhwt9t23mkGAAJiHgACZuZAV1wu2kLGfIkfPQQ",
+        "completedAt": "2026-11-02T06:01:28.376Z"
+      },
+      "queuePostId": "6729441444:488"
+    },
+    {
+      "code": "POST05",
+      "fileName": "POST05.png",
+      "topic": "Cùng kết nối để lan tỏa niềm vui cưới",
+      "caption": "🤝 Một trải nghiệm cưới đẹp thường được tạo nên từ nhiều đơn vị cùng phối hợp thật ăn ý. Thiệp cưới, studio, wedding planner, trang trí, sự kiện hay quà tặng đều có thể bổ trợ cho nhau để khách hàng nhận được nhiều giá trị hơn. Nếu bạn muốn kết nối hợp tác, hãy nhắn tin nhé! #doitaccuoi #weddingbusiness #thieponlineorg",
+      "width": 1254,
+      "height": 1254,
+      "characterCount": 319,
+      "hashtags": [
+        "#doitaccuoi",
+        "#weddingbusiness",
+        "#thieponlineorg"
+      ],
+      "sha256": "b85f94c1c3d9e52ad02424f78ce844d4e216011628dda989edb03da2db9c7732",
+      "proposedDueAt": "2026-11-04T07:00:00.000Z",
+      "proposedLocalTime": "2026-11-04 14:00",
+      "mediaName": "queue_6e4ac425150e9ddb42c6fe9c6fc44224.png",
+      "fingerprint": "f4b73b8ec3d13309c1f162ea94ee5f54d0377e7b702809a6a47d1e5b66775e0e",
+      "telegram": {
+        "status": "sent",
+        "messageId": 489,
+        "fileId": "BQACAgUAAxkDAAIB6WroJ0zxBrCyvjjxkhETKfn-dFtsAAJkHgACZuZAV4bZ4tRv20IQPQQ",
+        "completedAt": "2026-11-02T06:01:48.699Z"
+      },
+      "queuePostId": "6729441444:489"
+    }
+  ],
+  "channels": [
+    {
+      "id": "6ae061c02f1f5ed648e798cf",
+      "service": "threads",
+      "name": "bhhoang_1107"
+    },
+    {
+      "id": "6ae060c32f1f5ed648e7923f",
+      "service": "facebook",
+      "name": "Thiệp online Trọng Hoàng"
+    },
+    {
+      "id": "6ae04e2c2f1f5ed648e6e5cc",
+      "service": "tiktok",
+      "name": "thieponline.org"
+    }
+  ],
+  "queuedAt": "2026-11-02T06:01:48.721Z",
+  "verifiedAt": "2026-11-02T06:04:56.949Z"
+}

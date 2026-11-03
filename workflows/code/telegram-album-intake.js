@@ -10,15 +10,24 @@ if (callback) {
   const match = /^queue_retry:(\d+)$/.exec(callback.data ?? '');
   const calendar = /^calendar:(day|week|month):(20\d{2}-\d{2}-\d{2}):(\d{1,6})$/.exec(callback.data ?? '');
   const batch = /^batch:(start|preview|confirm|cancel):([a-f0-9]{12}|20\d{2}-\d{2}-\d{2})(?::([a-f0-9]{8}|\d{1,6}))?$/.exec(callback.data ?? '');
-  if (!publisherConfig.queue?.enabled || !(match || calendar || batch)) return [];
-  const commandText = match ? '/retry ' + match[1] : calendar ? '/calendar ' + calendar.slice(1).join(' ') : '/batch ' + batch.slice(1).filter(Boolean).join(' ');
-  return [{ json: { ...context, queueCommand: true, commandText, commandKey: 'callback:' + callback.id, callbackQueryId: callback.id } }];
+  const menu = /^menu:(import|queue|calendar|batch)$/.exec(callback.data ?? '');
+  const importAction = /^import:(preview|cancel|remove|files|drop|dropfile):([a-f0-9]{12})(?::([a-f0-9]{8}|\d{1,6}))?(?::(\d{1,6}))?$/.exec(callback.data ?? '');
+  if (!publisherConfig.queue?.enabled || !(match || calendar || batch || menu || importAction)) return [];
+  const commandText = match ? '/retry ' + match[1] : calendar ? '/calendar ' + calendar.slice(1).join(' ') : menu ? '/' + menu[1] + (menu[1] === 'batch' ? ' start' : '') : importAction ? '/import ' + importAction[1] + ' ' + importAction.slice(3).filter(Boolean).join(' ') : '/batch ' + batch.slice(1).filter(Boolean).join(' ');
+  return [{ json: { ...context, ...(importAction ? { importBatchId: importAction[2] } : {}), queueCommand: true, commandText, commandKey: 'callback:' + callback.id, callbackQueryId: callback.id } }];
 }
 const command = (message.text ?? '').split(/\s/, 1)[0].split('@', 1)[0];
 const sessionKey = context.chatId + ':' + context.ownerId;
 const queueState = publisherConfig.queue?.enabled ? queueStore.read() : undefined;
+if (publisherConfig.queue?.enabled) context.calendarKeyboard = { rows: [
+  { row: { buttons: [{ text: '📥 Nhập danh sách', additionalFields: { callback_data: 'menu:import' } }, { text: '📦 Gom bài', additionalFields: { callback_data: 'menu:batch' } }] } },
+  { row: { buttons: [{ text: '📋 Kho nội dung', additionalFields: { callback_data: 'menu:queue' } }, { text: '📅 Xem lịch', additionalFields: { callback_data: 'menu:calendar' } }] } },
+] };
 const batchId = queueState?.batchSessions?.[sessionKey];
 if (command === '/done' && batchId && !queueState.cropSessions?.[sessionKey]) return [{ json: { ...context, queueCommand: true, commandText: '/batch preview' } }];
+if (publisherConfig.queue?.enabled && command === '/import') return [{ json: { ...context, queueCommand: true, commandText: (message.text ?? '').replace(/^\/import(?:@\w+)?/, '/import') } }];
+const importResult = handleListImportMessage(message, context);
+if (importResult) return importResult;
 const cropResult = handleCropMessage(message, context);
 if (cropResult) return cropResult;
 const platformLabels = { tiktok: 'TikTok', facebook: 'Facebook Page', instagram: 'Instagram', threads: 'Threads' };
@@ -56,7 +65,7 @@ if (command === '/status') {
   if (!saved.targets?.length && !saved.postId) return reply(saved.text ?? 'Bài đang được chuẩn bị, chưa có kết quả đăng.');
   return [{ json: { ...context, messageId: saved.messageId, journalFile, queryStatus: true } }];
 }
-if (command.startsWith('/')) return reply(help + '\n\n📅 /calendar hoặc /lich — xem lịch ngày/tuần/tháng\n📦 /batch start — gom nhiều bài, xem trước và xác nhận lịch\n/batch preview — kiểm tra đợt đang gom\n✂️ /crop — bật chế độ cắt ảnh dài thành 3 cột có viền trắng và nền mờ.\n/done — xem trước đợt hoặc thoát chế độ cắt ảnh.');
+if (command.startsWith('/')) return reply(help + '\n\n📥 /import — nhập danh sách content và ảnh theo mã bài\n📅 /calendar hoặc /lich — xem lịch ngày/tuần/tháng\n📦 /batch start — gom nhiều bài, xem trước và xác nhận lịch\n/batch preview — kiểm tra đợt đang gom\n✂️ /crop — bật chế độ cắt ảnh dài thành 3 cột có viền trắng và nền mờ.\n/done — xem trước đợt hoặc thoát chế độ cắt ảnh.');
 const photo = message.photo?.[message.photo.length - 1];
 const file = photo ?? message.video ?? message.document;
 if (!file) return reply('Bài chưa có ảnh/video. Bạn có thể gửi một ảnh, album ảnh hoặc video có caption.');

@@ -11,7 +11,7 @@ const fakeFs = {};
 for (const method of ['readFileSync', 'writeFileSync', 'openSync', 'unlinkSync', 'statSync', 'existsSync']) fakeFs[method] = (name, ...args) => fs[method](local(name), ...args);
 fakeFs.renameSync = (from, to) => fs.renameSync(local(from), local(to)); fakeFs.closeSync = fd => fs.closeSync(fd);
 const config = { allowedUserIds: [456, 789], allowedChatIds: [456, 789], services: ['facebook'], queue: { enabled: true } };
-const code = ['telegram-queue-store', 'telegram-image-crop-intake', 'telegram-album-intake'].map(name => fs.readFileSync(path.join(root, 'workflows/code/' + name + '.js'), 'utf8')).join('\n');
+const code = ['telegram-queue-store', 'telegram-image-crop-intake', 'telegram-list-import-intake', 'telegram-album-intake'].map(name => fs.readFileSync(path.join(root, 'workflows/code/' + name + '.js'), 'utf8')).join('\n');
 const run = message => JSON.parse(JSON.stringify(vm.runInNewContext('(()=>{const publisherConfig=' + JSON.stringify(config) + ';\n' + code + '\n})()', { require: name => name === 'fs' ? fakeFs : crypto, $input: { first: () => ({ json: { message } }) } })));
 let id = 1;
 const message = (extra, owner = 456) => ({ message_id: id++, chat: { id: owner, type: 'private' }, from: { id: owner }, ...extra });

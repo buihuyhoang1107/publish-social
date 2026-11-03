@@ -4,6 +4,16 @@ if (command === '/calendar') return [{ json: { ...context, ...calendarTools.rend
 const result = queueStore.transact(state => {
   const key = context.chatId + ':' + (context.commandKey ?? context.messageId);
   if (state.commands[key]) return { ...state.commands[key], runQueue: false };
+  if (command === '/import') {
+    const response = { runQueue: false, ...listImportTools.handle(state, context, args) };
+    const batch = state.batches?.[state.batchSessions?.[context.chatId + ':' + context.ownerId]];
+    if (batch?.importMode && batch.status === 'collecting') {
+      if (!args.length || args[0] === 'start') response.calendarKeyboard = listImportTools.keyboard(batch);
+      else response.calendarKeyboard ??= listImportTools.keyboard(batch);
+    }
+    state.commands[key] = response;
+    return response;
+  }
   if (command === '/batch') {
     const response = { runQueue: false, ...bulkPlanTools.handle(state, context, args) };
     state.commands[key] = response;
